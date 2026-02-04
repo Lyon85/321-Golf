@@ -10,8 +10,8 @@
     Golf.createGolfCart = function (scene, x, y) {
         var body = scene.matter.add.rectangle(x, y, 60, 100, {
             chamfer: { radius: 10 },
-            friction: 0.01,
-            frictionAir: 0.01,
+            friction: 0.05,
+            frictionAir: 0.03,
             restitution: 0.2,
             density: 0.01,
             label: 'cart',
@@ -58,6 +58,20 @@
 
     Golf.handleDriving = function (scene, p) {
         var cart = p.driving;
+
+        // Grip physics (Lateral Friction)
+        var sideAngle = cart.body.angle;
+        var lx = Math.cos(sideAngle);
+        var ly = Math.sin(sideAngle);
+        var curVel = cart.body.velocity;
+        var latVel = curVel.x * lx + curVel.y * ly;
+        var grip = 0.8; // Reduce lateral sliding
+        
+        scene.matter.body.setVelocity(cart.body, {
+            x: curVel.x - latVel * lx * grip,
+            y: curVel.y - latVel * ly * grip
+        });
+
         var isTurbo = scene.keys.SHIFT.isDown;
 
         if (!p.turboRamp) p.turboRamp = 0;
