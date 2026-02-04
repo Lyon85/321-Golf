@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>321 Golf - Chaotic Town Golf</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Load Phaser 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+</head>
+
+<body>
+    <div id="game-container"></div>
+    <div id="ui-layer">
+        <div id="instruction-overlay">
+            <h1>321 GOLF</h1>
+            <p><strong>WASD</strong>: Move / Drive</p>
+            <p><strong>SHIFT</strong>: Fast Mode (Driving)</p>
+            <p><strong>E</strong>: Enter/Exit Golf Cart</p>
+            <p><strong>Left Click</strong>: Hold to Aim & Power, Release to Hit</p>
+            <p><strong>Goal</strong>: Sink your ball in 10 holes before the AI!</p>
+            <p class="hint">Press SPACE or CLICK to Start</p>
+        </div>
+        <div id="countdown" class="hidden">3</div>
+        <div id="power-meter-container" class="hidden">
+            <div id="power-meter-fill"></div>
+        </div>
+        <div id="club-info">
+            <div id="club-1" class="club-slot empty">Slot 1</div>
+            <div id="club-2" class="club-slot empty">Slot 2</div>
+        </div>
+        <div id="score-board">
+            Hole: <span id="current-hole">0</span>/10
+        </div>
+        <div id="speedometer" class="hidden">
+            <div id="speed-value">0</div>
+            <div id="speed-unit">KM/H</div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+
+</html>
