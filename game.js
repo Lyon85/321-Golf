@@ -7,7 +7,7 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
-let players = [], hole, clubs = [], golfCarts = [], currentHoleIndex = 0, isMatchActive = false, isWaitingToStart = true, aimLine, hitConeGraphics, particles;
+let players = [], hole, holeSensor, holeArrow, clubs = [], golfCarts = [], currentHoleIndex = 0, isMatchActive = false, isWaitingToStart = true, aimLine, hitConeGraphics, particles;
 
 // Collision Categories
 const CAT_DEFAULT = 0x0001;
@@ -15,6 +15,7 @@ const CAT_PLAYER = 0x0002;
 const CAT_BALL = 0x0004;
 const CAT_BUILDING = 0x0010;
 const CAT_CAR = 0x0020;
+const CAT_HOLE = 0x0040;
 
 const CLUB_TYPES = {
     DRIVER: { name: 'Driver', power: 0.015, accuracy: 0.7, color: 0xffd32a },
@@ -47,9 +48,56 @@ function create() {
 
     // createTown(scene);
     spawnClubs(scene);
-    hole = scene.add.circle(0, 0, 35, 0x000000).setDepth(-1).setStrokeStyle(5, 0x2ed573);
+    const HOLE_RADIUS = 35;
+    hole = scene.add.circle(0, 0, HOLE_RADIUS, 0x000000).setDepth(1).setStrokeStyle(6, 0x2c2c2c);
     scene.tweens.add({ targets: hole, scale: 1.2, duration: 800, yoyo: true, repeat: -1 });
-    spawnHole(scene);
+    spawnHole(scene, true); // First hole near player start so ball can go in
+
+    // Physics sensor so ball collides with hole and sinks (same size as visual)
+    holeSensor = scene.matter.add.circle(hole.x, hole.y, HOLE_RADIUS, {
+        isStatic: true,
+        isSensor: true,
+        label: 'hole',
+        collisionFilter: {
+            category: CAT_HOLE,
+            mask: CAT_BALL
+        }
+    });
+
+    scene.sinkCooldownFrames = 0;
+    scene.matter.world.on('collisionactive', (event) => {
+        if (!isMatchActive || scene.sinkCooldownFrames > 0) return;
+        for (const pair of event.pairs) {
+            const a = pair.bodyA, b = pair.bodyB;
+            const holeBody = a.label === 'hole' ? a : b.label === 'hole' ? b : null;
+            const ballBody = a.label === 'ball' ? a : b.label === 'ball' ? b : null;
+            if (!holeBody || !ballBody) continue;
+            const ballSpeed = Math.sqrt(ballBody.velocity.x ** 2 + ballBody.velocity.y ** 2);
+            if (ballSpeed > 6) continue; // Only sink when moving slowly enough
+            const player = players.find(p => p.ball === ballBody);
+            if (player) {
+                scene.sinkCooldownFrames = 90; // ~1.5s so we don't double-count
+                onBallSunk(scene, player);
+            }
+            break;
+        }
+    });
+
+    // Arrow pointing to hole (screen-space, fixed to camera)
+    const arrowSize = 24;
+    const arrowG = scene.make.graphics({ x: 0, y: 0, add: false });
+    arrowG.fillStyle(0x2ed573, 1);
+    arrowG.lineStyle(3, 0xffffff, 1);
+    arrowG.beginPath();
+    arrowG.moveTo(0, -arrowSize);
+    arrowG.lineTo(-arrowSize * 0.7, arrowSize * 0.6);
+    arrowG.lineTo(0, arrowSize * 0.3);
+    arrowG.lineTo(arrowSize * 0.7, arrowSize * 0.6);
+    arrowG.closePath();
+    arrowG.fillPath();
+    arrowG.strokePath();
+    arrowG.generateTexture('holeArrow', arrowSize * 2.5, arrowSize * 2.5);
+    holeArrow = scene.add.image(0, 0, 'holeArrow').setScrollFactor(0).setDepth(100);
 
     aimLine = scene.add.graphics().setDepth(10);
     hitConeGraphics = scene.add.graphics().setDepth(9);
@@ -57,7 +105,7 @@ function create() {
     players.push(createPlayer(scene, HALF_WORLD_SIZE + 100, HALF_WORLD_SIZE, 0x1e90ff, true));
     players.push(createPlayer(scene, HALF_WORLD_SIZE - 100, HALF_WORLD_SIZE, 0xfeca57, true));
 
-    scene.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,E,SHIFT');
+    scene.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,E,SHIFT,ONE,TWO');
     scene.cameras.main.startFollow(players[0].sprite, true, 0.1, 0.1);
 
     // Initial Golf Cart near spawn
@@ -109,7 +157,7 @@ function createPlayer(scene, x, y, color, isAI) {
         label: 'ball',
         collisionFilter: {
             category: CAT_BALL,
-            mask: CAT_BUILDING | CAT_DEFAULT
+            mask: CAT_BUILDING | CAT_DEFAULT | CAT_HOLE
         }
     });
     const bSprite = scene.add.circle(0, 0, 8, 0xffffff).setStrokeStyle(1, 0x000000).setDepth(5);
@@ -152,7 +200,19 @@ function createTown(scene) {
     }
 }
 
-function spawnHole(scene) { hole.setPosition(Phaser.Math.Between(1000, 19000), Phaser.Math.Between(1000, 19000)); }
+function spawnHole(scene, nearStart = false) {
+    const HALF = 10000;
+    let hx, hy;
+    if (nearStart) {
+        hx = HALF + Phaser.Math.Between(-200, 200);
+        hy = HALF + Phaser.Math.Between(-200, 200);
+    } else {
+        hx = Phaser.Math.Between(1000, 19000);
+        hy = Phaser.Math.Between(1000, 19000);
+    }
+    hole.setPosition(hx, hy);
+    if (holeSensor) scene.matter.body.setPosition(holeSensor, { x: hx, y: hy });
+}
 
 function startCountdown(scene) {
     let count = 3; scene.countdownEl.classList.remove('hidden'); scene.countdownEl.innerText = count; isMatchActive = false;
@@ -167,6 +227,25 @@ function startCountdown(scene) {
 function update() {
     const scene = this;
     if (isWaitingToStart) return;
+    if (scene.sinkCooldownFrames > 0) scene.sinkCooldownFrames--;
+
+    // Update hole arrow: place at screen edge pointing toward hole
+    const cam = scene.cameras.main;
+    const centerX = cam.scrollX + cam.width / 2;
+    const centerY = cam.scrollY + cam.height / 2;
+    const dx = hole.x - centerX;
+    const dy = hole.y - centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const margin = 70;
+    const edgeDist = Math.min(cam.width, cam.height) / 2 - margin;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    holeArrow.setPosition(
+        cam.width / 2 + nx * edgeDist,
+        cam.height / 2 + ny * edgeDist
+    );
+    holeArrow.setRotation(Math.atan2(ny, nx) + Math.PI / 2);
+    holeArrow.setVisible(dist > 80);
 
     players.forEach(p => {
         if (p.isAI) handleAIBehavior(scene, p); else handleHumanInput(scene, p);
@@ -174,8 +253,6 @@ function update() {
         p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y);
         const bSpeed = Math.sqrt(p.ball.velocity.x ** 2 + p.ball.velocity.y ** 2);
         p.trail.emitting = bSpeed > 2;
-        const distToHole = Phaser.Math.Distance.Between(p.ball.position.x, p.ball.position.y, hole.x, hole.y);
-        if (distToHole < 30 && bSpeed < 2.0 && isMatchActive) onBallSunk(scene, p);
 
         if (p.inventory.length < 2) {
             clubs.forEach(c => {
@@ -184,6 +261,17 @@ function update() {
                     c.sprite.visible = false; c.txt.visible = false; if (!p.isAI) updateClubUI(p);
                 }
             });
+        }
+
+        // Club selection: 1 or 2 to switch active club
+        if (!p.isAI && p.inventory.length >= 1) {
+            if (Phaser.Input.Keyboard.JustDown(scene.keys.ONE) && p.inventory[0]) {
+                p.activeClub = p.inventory[0];
+                updateClubUI(p);
+            } else if (Phaser.Input.Keyboard.JustDown(scene.keys.TWO) && p.inventory[1]) {
+                p.activeClub = p.inventory[1];
+                updateClubUI(p);
+            }
         }
 
         // Golf Cart interaction check
@@ -226,10 +314,16 @@ function update() {
 }
 
 function updateClubUI(p) {
+    const scene = game.scene.scenes[0];
     p.inventory.forEach((club, i) => {
-        const el = game.scene.scenes[0].clubSlots[i];
-        el.innerText = club.name; el.classList.remove('empty');
-        el.style.border = `3px solid #${club.color.toString(16).padStart(6, '0')}`;
+        const el = scene.clubSlots[i];
+        el.innerText = club.name;
+        el.classList.remove('empty', 'active');
+        const isActive = p.activeClub === club;
+        const colorHex = '#' + club.color.toString(16).padStart(6, '0');
+        el.style.border = isActive ? `4px solid ${colorHex}` : `3px solid ${colorHex}`;
+        el.style.boxShadow = isActive ? `0 0 12px ${colorHex}` : 'none';
+        if (isActive) el.classList.add('active');
     });
 }
 
@@ -271,20 +365,26 @@ function handlePlayerMovement(scene, p) {
     let speedCap = 3.5;
 
     if (p.isAiming) {
-        force *= 0.5;
-        speedCap *= 0.5;
+        force *= 0.25;  // Much slower when aiming
+        speedCap *= 0.35;
     }
 
-    if (scene.keys.W.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: 0, y: -force });
-    if (scene.keys.S.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: 0, y: force });
-    if (scene.keys.A.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: -force, y: 0 });
-    if (scene.keys.D.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: force, y: 0 });
+    const anyMove = scene.keys.W.isDown || scene.keys.S.isDown || scene.keys.A.isDown || scene.keys.D.isDown;
+    if (p.isAiming && !anyMove) {
+        // No inertia when aiming: stop immediately when keys released
+        scene.matter.body.setVelocity(p.body, { x: 0, y: 0 });
+    } else {
+        if (scene.keys.W.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: 0, y: -force });
+        if (scene.keys.S.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: 0, y: force });
+        if (scene.keys.A.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: -force, y: 0 });
+        if (scene.keys.D.isDown) scene.matter.body.applyForce(p.body, p.body.position, { x: force, y: 0 });
 
-    // Speed Cap
-    const speed = Math.sqrt(p.body.velocity.x ** 2 + p.body.velocity.y ** 2);
-    if (speed > speedCap) { // Further reduced speed cap
-        const ratio = speedCap / speed;
-        scene.matter.body.setVelocity(p.body, { x: p.body.velocity.x * ratio, y: p.body.velocity.y * ratio });
+        // Speed Cap
+        const speed = Math.sqrt(p.body.velocity.x ** 2 + p.body.velocity.y ** 2);
+        if (speed > speedCap) {
+            const ratio = speedCap / speed;
+            scene.matter.body.setVelocity(p.body, { x: p.body.velocity.x * ratio, y: p.body.velocity.y * ratio });
+        }
     }
 }
 
