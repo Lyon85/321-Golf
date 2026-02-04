@@ -66,7 +66,7 @@
         var curVel = cart.body.velocity;
         var latVel = curVel.x * lx + curVel.y * ly;
         var grip = 0.8; // Reduce lateral sliding
-        
+
         scene.matter.body.setVelocity(cart.body, {
             x: curVel.x - latVel * lx * grip,
             y: curVel.y - latVel * ly * grip
@@ -81,11 +81,11 @@
             p.turboRamp = Math.max(0, p.turboRamp - 0.032);
         }
 
-        var baseMax = 6;
-        var turboBoost = 1.5;
+        var baseMax = 8;
+        var turboBoost = 3.0;
         var currentMax = baseMax + turboBoost * p.turboRamp;
 
-        var baseForce = 0.012;
+        var baseForce = 0.02;
         var turboForceBoost = 0.008;
         var force = baseForce + turboForceBoost * p.turboRamp;
 
