@@ -155,6 +155,24 @@
                 });
                 p.lastSafePos = { x: p.ball.position.x, y: p.ball.position.y };
 
+                // Ball flight animation (not for Putter)
+                if (club.name !== 'Putter' && p.power > 50) {
+                    var flightDuration = 800 + (p.power / 100) * 400;
+                    var maxH = (p.power / 100) * 40;
+                    p.ballInFlight = true;
+                    scene.tweens.add({
+                        targets: p,
+                        ballHeight: maxH,
+                        duration: flightDuration / 2,
+                        ease: 'Quad.out',
+                        yoyo: true,
+                        onComplete: function () {
+                            p.ballInFlight = false;
+                            p.ballHeight = 0;
+                        }
+                    });
+                }
+
                 scene.cameras.main.shake(200, 0.005);
             }
 

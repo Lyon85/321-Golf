@@ -121,7 +121,14 @@
             }
 
             p.sprite.setPosition(p.body.position.x, p.body.position.y);
-            p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y);
+
+            p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y - p.ballHeight);
+            p.ballSprite.setScale(1 + p.ballHeight / 40);
+
+            p.ballShadow.setPosition(p.ball.position.x, p.ball.position.y);
+            p.ballShadow.setVisible(p.ballHeight > 0);
+            p.ballShadow.setScale(1 - p.ballHeight / 100);
+
             var bSpeed = Math.sqrt(p.ball.velocity.x * p.ball.velocity.x + p.ball.velocity.y * p.ball.velocity.y);
             p.trail.emitting = bSpeed > 2;
 

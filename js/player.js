@@ -31,6 +31,7 @@
         });
         bBody.baseFrictionAir = 0.01;
         var bSprite = scene.add.circle(0, 0, 8, 0xffffff).setStrokeStyle(1, 0x000000).setDepth(5);
+        var bShadow = scene.add.circle(0, 0, 8, 0x000000, 0.3).setDepth(4).setVisible(false);
         var trail = scene.add.particles(0, 0, 'white', {
             follow: bSprite,
             scale: { start: 0.5, end: 0 },
@@ -45,6 +46,9 @@
             sprite: pSprite,
             ball: bBody,
             ballSprite: bSprite,
+            ballShadow: bShadow,
+            ballHeight: 0,
+            ballInFlight: false,
             isAI: isAI,
             color: color,
             isAiming: false,
