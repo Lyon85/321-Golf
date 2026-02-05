@@ -9,6 +9,7 @@
 
     function create() {
         var scene = this;
+
         var WORLD_SIZE = 20000;
         var HALF_WORLD_SIZE = WORLD_SIZE / 2;
 
