@@ -15,6 +15,10 @@
         aimLine: null,
         hitConeGraphics: null,
         particles: null,
-        terrains: []
+        terrains: [],
+        isHost: true,
+        connection: null,
+        remotePlayers: {},
+        myId: null
     };
 })(typeof window !== 'undefined' ? window : this);

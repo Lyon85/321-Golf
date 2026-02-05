@@ -34,8 +34,21 @@
             }
         };
         window.addEventListener('keydown', function (e) {
-            if (e.code === 'Space') startTrigger();
+            if (e.code === 'Space') {
+                // Don't start if typing in an input
+                if (document.activeElement.tagName === 'INPUT') return;
+                startTrigger();
+            }
         });
-        scene.overlay.addEventListener('click', startTrigger);
+        scene.overlay.addEventListener('click', function (e) {
+            // Don't start if clicking on multiplayer controls or its children
+            var controls = document.getElementById('multiplayer-controls');
+            if (controls && controls.contains(e.target)) return;
+
+            // Also ignore inputs and buttons just in case
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+
+            startTrigger();
+        });
     };
 })(typeof window !== 'undefined' ? window : this);
