@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>321 Golf - Chaotic Town Golf</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Load Phaser 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <div id="game-container"></div>
+    <div id="ui-layer">
+        <div id="instruction-overlay">
+            <h1>321 GOLF!</h1>
+            <p><strong>WASD</strong>: Move / Drive</p>
+            <p><strong>SHIFT</strong>: Fast Mode (Driving)</p>
+            <p><strong>E</strong>: Enter/Exit Golf Cart</p>
+            <p><strong>1 / 2</strong>: Switch between Club Slot 1 and Slot 2</p>
+            <p><strong>Left Click</strong>: Hold to Aim & Power, Release to Hit</p>
+            <p><strong>Goal</strong>: Sink your ball in 10 holes before the AI!</p>
+            <div id="multiplayer-controls">
+                <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 5px;">Share your ID with a friend to play
+                    together:</p>
+
+                <div class="lobby-section">
+                    <label>My ID: <span id="my-id">...</span></label>
+                    <button id="copy-id-btn">Copy</button>
+                </div>
+
+                <div class="lobby-section"
+                    style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <input type="text" id="friend-id-input" placeholder="GOLF-XXXX">
+                    <button id="join-btn">Join Game</button>
+                </div>
+            </div>
+            <p id="lobby-status" class="hint">Waiting for Players</p>
+            <p id="ready-status" class="hint hidden"></p>
+        </div>
+        <div id="countdown" class="hidden">3</div>
+        <div id="power-meter-container" class="hidden">
+            <div id="power-meter-fill"></div>
+        </div>
+        <div id="club-info">
+            <div id="club-1" class="club-slot empty">Slot 1</div>
+            <div id="club-2" class="club-slot empty">Slot 2</div>
+        </div>
+        <div id="score-board">
+            Hole: <span id="current-hole">0</span>/10
+        </div>
+        <div id="speedometer" class="hidden">
+            <div id="speed-value">0</div>
+            <div id="speed-unit">KM/H</div>
+        </div>
+    </div>
+    <script src="js/constants.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/assets.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/clubs.js"></script>
+    <script src="js/hole.js"></script>
+    <script src="js/countdown.js"></script>
+    <script src="js/golfCart.js"></script>
+    <script src="js/movement.js"></script>
+    <script src="js/aiming.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/town.js"></script>
+    <script src="js/terrain.js"></script>
+    <script src="js/networking.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

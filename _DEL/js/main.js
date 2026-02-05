@@ -82,15 +82,7 @@
             blendMode: 'ADD'
         });
 
-        if (state.isHost) {
-            // state.generatedClubs = Golf.spawnClubs(scene);
-            // NOW DEFERRED: Clubs spawn on connection (networking.js) or start trigger (countdown.js)
-            console.log('[Main] Host waiting for Connection or Start to spawn clubs.');
-        } else {
-            console.log('[Main] Guest waiting for CLUBS_INIT');
-        }
-
-
+        //Golf.spawnClubs(scene);
         Golf.createHole(scene);
         Golf.createTerrains(scene);
 
@@ -123,7 +115,7 @@
         scene.cameras.main.startFollow(state.players[0].sprite, true, 0.1, 0.1);
 
         state.players.forEach(function (p) {
-            Golf.createGolfCart(scene, p.body.position.x + 60, p.body.position.y, p.color, p.playerIndex);
+            Golf.createGolfCart(scene, p.body.position.x + 60, p.body.position.y);
         });
 
         scene.interactionText = scene.add
@@ -161,7 +153,10 @@
         Golf.updateHoleArrow(scene);
 
         if (state.isHost) {
-            Golf.broadcastState(scene);
+            // Broadcast at ~30fps to save bandwidth and prevent buffer overflow
+            if (scene.time.now % 32 < 16) {
+                Golf.broadcastState(scene);
+            }
         } else {
             Golf.sendGuestInput(scene);
         }
@@ -280,7 +275,7 @@
             p.trail.emitting = bSpeed > 2;
 
             if (p.inventory.length < 2) {
-                state.clubs.forEach(function (c, i) {
+                state.clubs.forEach(function (c) {
                     if (
                         c.sprite.visible &&
                         Phaser.Math.Distance.Between(
@@ -293,9 +288,6 @@
                         c.sprite.visible = false;
                         c.txt.visible = false;
                         if (!p.isAI) Golf.updateClubUI(p);
-
-                        // Sync: Tell everyone this club is gone
-                        if (state.isHost) Golf.broadcastPickup(i);
                     }
                 });
             }
@@ -366,35 +358,11 @@
 
     function handleRemotePlayerInput(scene, p) {
         if (!p.remoteKeys) return;
+        // Host uses Guest's keys to move the Guest's player object in the Host's physics world
+        Golf.handlePlayerMovement(scene, p, p.remoteKeys);
 
-        // Handle E key for entering/exiting (Guest interaction on Host)
-        // We need a debounce or justOneDown check for remote E
-        if (p.remoteKeys.E && !p.remoteEWasDown) {
-            // "Just Down" logic for remote player
-            if (p.driving) {
-                Golf.exitCart(p);
-            } else {
-                var nearCart = null;
-                state.golfCarts.forEach(function (cart) {
-                    var dist = Phaser.Math.Distance.Between(
-                        p.body.position.x, p.body.position.y,
-                        cart.body.position.x, cart.body.position.y
-                    );
-                    if (dist < 80) nearCart = cart;
-                });
-                if (nearCart) Golf.enterCart(p, nearCart);
-            }
-        }
-        p.remoteEWasDown = p.remoteKeys.E;
-
-        // Use custom handleHumanInput-like logic but with remote inputs
-        if (p.driving) {
-            Golf.handleDriving(scene, p, p.remoteKeys);
-        } else {
-            Golf.handlePlayerMovement(scene, p, p.remoteKeys);
-            if (p.remotePointer) {
-                Golf.handleAiming(scene, p, p.remotePointer);
-            }
+        if (p.remotePointer) {
+            Golf.handleAiming(scene, p, p.remotePointer);
         }
     }
 

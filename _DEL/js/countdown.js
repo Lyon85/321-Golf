@@ -27,13 +27,6 @@
 
     Golf.triggerStart = function (scene) {
         if (state.isWaitingToStart) {
-
-            // Single Player / Fallback Spawning
-            if (state.isHost && (!state.generatedClubs || state.generatedClubs.length === 0)) {
-                console.log('[Countdown] Starting single player/host game. Spawning clubs...');
-                state.generatedClubs = Golf.spawnClubs(scene);
-            }
-
             state.isWaitingToStart = false;
             if (scene.overlay) scene.overlay.style.display = 'none';
             Golf.startCountdown(scene);

@@ -49,6 +49,21 @@
             updateLobbyUI("Friend Joined! Match Starting...");
             conn.send({ type: 'START_GAME' });
 
+            // Send World State (Clubs)
+            // Ensure clubs exist (Deferred Spawning)
+            if (!state.generatedClubs || state.generatedClubs.length === 0) {
+                var scene = state.game.scene.scenes[0];
+                console.log('[Net] Connection made! Spawning clubs now...');
+                state.generatedClubs = Golf.spawnClubs(scene);
+            }
+
+            if (state.generatedClubs) {
+                conn.send({
+                    type: 'CLUBS_INIT',
+                    clubs: state.generatedClubs
+                });
+            }
+
             var scene = state.game.scene.scenes[0];
             if (scene) Golf.triggerStart(scene);
         });
@@ -142,6 +157,19 @@
             } else if (data.type === 'START_GAME') {
                 var scene = state.game.scene.scenes[0];
                 if (scene) Golf.triggerStart(scene);
+            } else if (data.type === 'CLUBS_INIT') {
+                var scene = state.game.scene.scenes[0];
+                console.log(`[Client] Received CLUBS_INIT. Spawning ${data.clubs.length} clubs.`);
+                Golf.spawnClubs(scene, data.clubs);
+            } else if (data.type === 'CLUB_REMOVED') {
+                var c = state.clubs[data.index];
+                if (c && c.sprite.visible) {
+                    c.sprite.visible = false;
+                    c.txt.visible = false;
+                    c.sprite.destroy();
+                    c.txt.destroy();
+                    console.log(`[Sync] Removed club at index ${data.index}`);
+                }
             } else {
                 if (state.isHost) handleGuestInput(data);
                 else handleHostStateUpdate(data);
@@ -179,24 +207,133 @@
             var scene = state.game.scene.scenes[0];
             if (!scene) return;
             state.isMatchActive = data.matchActive;
+
             data.players.forEach(function (pData) {
                 var p = state.players[pData.id];
-                if (p) {
-                    scene.matter.body.setPosition(p.body, { x: pData.x, y: pData.y });
-                    scene.matter.body.setAngle(p.body, pData.angle);
-                    scene.matter.body.setVelocity(p.body, { x: 0, y: 0 });
+                if (!p) return;
+
+                // Inventory Sync (Runs for EVERYONE)
+                if (pData.inventory) {
+                    p.inventory = pData.inventory;
+
+                    var newActive = (pData.activeClubIndex >= 0 && p.inventory[pData.activeClubIndex])
+                        ? p.inventory[pData.activeClubIndex]
+                        : null;
+
+                    if (p.activeClub !== newActive) {
+                        p.activeClub = newActive;
+
+                        // Only update UI if this is the local player!
+                        var isLocalPlayer = (!state.isHost && p.playerIndex === 1) || (state.isHost && p.playerIndex === 0);
+
+                        console.log(`[Sync] P${p.playerIndex} Update. Inventory: ${p.inventory.length}, Active: ${p.activeClub ? p.activeClub.name : 'None'}, IsLocal: ${isLocalPlayer}`);
+
+                        if (isLocalPlayer && !p.isAI) {
+                            console.log(`[Sync] UPDATING UI for P${p.playerIndex}`);
+                            Golf.updateClubUI(p);
+                        }
+                    }
+                }
+
+                var isLocal = (!state.isHost && pData.id === 1);
+
+                if (isLocal) {
+                    if (p.driving) {
+                        // If driving, our position is locked to the cart locally by physics
+                        // so we ignore server updates for the player body itself
+                    } else {
+                        // Client-side prediction reconciliation
+                        var dist = Phaser.Math.Distance.Between(p.body.position.x, p.body.position.y, pData.x, pData.y);
+                        if (dist > 100) { // Only snap if way off
+                            scene.matter.body.setPosition(p.body, { x: pData.x, y: pData.y });
+                        }
+                    }
+                    // For local player, we trust our own physics mostly, but host can nudge us
+                    // We sync ball position more strictly as host owns the 'real' ball
+                    scene.matter.body.setPosition(p.ball, { x: pData.ballX, y: pData.ballY });
+                    scene.matter.body.setVelocity(p.ball, pData.ballVel || { x: 0, y: 0 });
+                } else {
+                    // Remote player: Smooth interpolation
+                    if (pData.isDriving) {
+                        p.sprite.setVisible(false);
+                        // If driving, we rely on the car's position usually
+                    } else {
+                        p.sprite.setVisible(true);
+                        // Instead of setPosition, we'll nudge it or just set it if it's the first time
+                        var dist = Phaser.Math.Distance.Between(p.body.position.x, p.body.position.y, pData.x, pData.y);
+                        if (dist > 200) {
+                            scene.matter.body.setPosition(p.body, { x: pData.x, y: pData.y });
+                        } else {
+                            // Soft nudge towards the target
+                            scene.matter.body.setPosition(p.body, {
+                                x: p.body.position.x + (pData.x - p.body.position.x) * 0.3,
+                                y: p.body.position.y + (pData.y - p.body.position.y) * 0.3
+                            });
+                        }
+                        scene.matter.body.setAngle(p.body, pData.angle);
+                        scene.matter.body.setVelocity(p.body, pData.vel || { x: 0, y: 0 });
+                    }
+
                     scene.matter.body.setPosition(p.ball, { x: pData.ballX, y: pData.ballY });
                     scene.matter.body.setVelocity(p.ball, pData.ballVel || { x: 0, y: 0 });
                 }
             });
+
             data.carts.forEach(function (cData) {
                 var cart = state.golfCarts[cData.id];
                 if (cart) {
-                    scene.matter.body.setPosition(cart.body, { x: cData.x, y: cData.y });
-                    scene.matter.body.setAngle(cart.body, cData.angle);
-                    scene.matter.body.setVelocity(cart.body, { x: 0, y: 0 });
+                    // Check if anyone is driving this cart local to us
+                    var isBeingDrivenLocally = false;
+                    state.players.forEach(function (p, idx) {
+                        if (idx === 1 && !state.isHost && p.driving === cart) isBeingDrivenLocally = true;
+                    });
+
+                    if (isBeingDrivenLocally) {
+                        var dist = Phaser.Math.Distance.Between(cart.body.position.x, cart.body.position.y, cData.x, cData.y);
+                        if (dist > 150) {
+                            scene.matter.body.setPosition(cart.body, { x: cData.x, y: cData.y });
+                            if (cData.vel) scene.matter.body.setVelocity(cart.body, cData.vel);
+                        } else if (dist > 5) {
+                            // Soft reconciliation: Nudge towards server position
+                            var lerp = 0.1;
+                            scene.matter.body.setPosition(cart.body, {
+                                x: cart.body.position.x + (cData.x - cart.body.position.x) * lerp,
+                                y: cart.body.position.y + (cData.y - cart.body.position.y) * lerp
+                            });
+                        }
+
+                        // Angle Soft Sync for local driver (fixes rotation drift)
+                        var angleDiff = cData.angle - cart.body.angle;
+                        // Normalize to -PI to PI
+                        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+                        if (Math.abs(angleDiff) > 0.05) {
+                            scene.matter.body.setAngle(cart.body, cart.body.angle + angleDiff * 0.1);
+                        }
+                    } else {
+                        var dist = Phaser.Math.Distance.Between(cart.body.position.x, cart.body.position.y, cData.x, cData.y);
+                        if (dist > 300) {
+                            scene.matter.body.setPosition(cart.body, { x: cData.x, y: cData.y });
+                        } else {
+                            scene.matter.body.setPosition(cart.body, {
+                                x: cart.body.position.x + (cData.x - cart.body.position.x) * 0.3,
+                                y: cart.body.position.y + (cData.y - cart.body.position.y) * 0.3
+                            });
+                        }
+
+                        // Soft angle lerp for remote carts too (instead of snap)
+                        var angleDiff = cData.angle - cart.body.angle;
+                        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+                        scene.matter.body.setAngle(cart.body, cart.body.angle + angleDiff * 0.2);
+
+                        scene.matter.body.setVelocity(cart.body, cData.vel || { x: 0, y: 0 });
+                    }
                 }
             });
+
             if (state.hole) {
                 state.hole.setPosition(data.hole.x, data.hole.y);
                 if (state.holeSensor) scene.matter.body.setPosition(state.holeSensor, { x: data.hole.x, y: data.hole.y });
@@ -209,13 +346,29 @@
         state.connection.send({
             type: 'STATE_UPDATE',
             players: state.players.map(function (p, index) {
+                if (Math.random() < 0.01) console.log(`[Host] Sending P${index} Inv: ${p.inventory ? p.inventory.length : 0}`);
                 return {
-                    id: index, x: p.body.position.x, y: p.body.position.y, angle: p.body.angle,
-                    ballX: p.ball.position.x, ballY: p.ball.position.y, ballVel: p.ball.velocity
+                    id: index,
+                    x: p.body.position.x,
+                    y: p.body.position.y,
+                    vel: p.body.velocity,
+                    angle: p.body.angle,
+                    ballX: p.ball.position.x,
+                    ballY: p.ball.position.y,
+                    ballVel: p.ball.velocity,
+                    isDriving: !!p.driving,
+                    inventory: p.inventory,
+                    activeClubIndex: p.inventory ? p.inventory.indexOf(p.activeClub) : -1
                 };
             }),
             carts: state.golfCarts.map(function (c, index) {
-                return { id: index, x: c.body.position.x, y: c.body.position.y, angle: c.body.angle };
+                return {
+                    id: index,
+                    x: c.body.position.x,
+                    y: c.body.position.y,
+                    vel: c.body.velocity,
+                    angle: c.body.angle
+                };
             }),
             hole: { x: state.hole.x, y: state.hole.y },
             matchActive: state.isMatchActive
@@ -233,6 +386,17 @@
                     SPACE: keys.SPACE.isDown, SHIFT: keys.SHIFT.isDown, E: keys.E.isDown
                 },
                 pointer: { worldX: pointer.worldX, worldY: pointer.worldY, isDown: pointer.isDown }
+            });
+        }
+    };
+
+    Golf.broadcastPickup = function (index) {
+        if (!state.connection) return;
+        // Host broadcasts to Guest
+        if (state.isHost) {
+            state.connection.send({
+                type: 'CLUB_REMOVED',
+                index: index
             });
         }
     };

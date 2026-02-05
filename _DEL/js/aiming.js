@@ -144,53 +144,46 @@
                 var terrainAccuracyPenalty = terrain.shotAccuracyPenalty || 0;
 
                 var accuracyDeviation = (distFactor + terrainAccuracyPenalty) * Math.PI;
+                var jitter = (Math.random() - 0.5) * accuracyDeviation;
+
+                if (tile.type === 'rough' || tile.type === 'sand') {
+                    var label = tile.type === 'rough' ? 'ROUGH!' : 'SAND!';
+                    var color = tile.type === 'rough' ? '#feca57' : '#ff9f43';
+                    var txt = scene.add.text(playerX, playerY - 40, label, {
+                        family: 'Outfit',
+                        fontSize: '28px',
+                        fontStyle: '900',
+                        color: color,
+                        stroke: '#ffffff',
+                        strokeThickness: 4
+                    }).setOrigin(0.5).setDepth(100);
+                    scene.tweens.add({
+                        targets: txt,
+                        y: playerY - 100,
+                        alpha: 0,
+                        duration: 1000,
+                        onComplete: function () { txt.destroy(); }
+                    });
+                } else if (distFactor >= 0.75) {
+                    var sliceText = scene.add.text(playerX, playerY - 40, 'SLICE!', {
+                        family: 'Outfit',
+                        fontSize: '28px',
+                        fontStyle: '900',
+                        color: '#ff4757',
+                        stroke: '#ffffff',
+                        strokeThickness: 4
+                    }).setOrigin(0.5).setDepth(100);
+                    scene.tweens.add({
+                        targets: sliceText,
+                        y: playerY - 100,
+                        alpha: 0,
+                        duration: 1000,
+                        onComplete: function () { sliceText.destroy(); }
+                    });
+                }
 
                 var originalShotAngle = mouseAngle;
-
-                // Deterministic jitter based on power and position to keep host/guest in sync
-                var seed = (p.power * 1000) + p.body.position.x + p.body.position.y;
-                var pseudoRandom = (Math.abs(Math.sin(seed)) + Math.abs(Math.cos(seed * 1.5))) / 2; // Stable pseudo-random 0-1
-                var jitter = (pseudoRandom - 0.5) * accuracyDeviation;
-
                 var finalShotAngle = originalShotAngle + jitter;
-
-                if (isLocal) {
-                    if (tile.type === 'rough' || tile.type === 'sand') {
-                        var label = tile.type === 'rough' ? 'ROUGH!' : 'SAND!';
-                        var color = tile.type === 'rough' ? '#feca57' : '#ff9f43';
-                        var txt = scene.add.text(playerX, playerY - 40, label, {
-                            family: 'Outfit',
-                            fontSize: '28px',
-                            fontStyle: '900',
-                            color: color,
-                            stroke: '#ffffff',
-                            strokeThickness: 4
-                        }).setOrigin(0.5).setDepth(100);
-                        scene.tweens.add({
-                            targets: txt,
-                            y: playerY - 100,
-                            alpha: 0,
-                            duration: 1000,
-                            onComplete: function () { txt.destroy(); }
-                        });
-                    } else if (distFactor >= 0.75) {
-                        var sliceText = scene.add.text(playerX, playerY - 40, 'SLICE!', {
-                            family: 'Outfit',
-                            fontSize: '28px',
-                            fontStyle: '900',
-                            color: '#ff4757',
-                            stroke: '#ffffff',
-                            strokeThickness: 4
-                        }).setOrigin(0.5).setDepth(100);
-                        scene.tweens.add({
-                            targets: sliceText,
-                            y: playerY - 100,
-                            alpha: 0,
-                            duration: 1000,
-                            onComplete: function () { sliceText.destroy(); }
-                        });
-                    }
-                }
                 var finalForce = (p.power / 100) * club.power * pwrMult * terrainPowerMult;
 
                 scene.matter.body.applyForce(p.ball, p.ball.position, {
