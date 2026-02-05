@@ -19,7 +19,8 @@
         scene.add
             .grid(HALF_WORLD_SIZE, HALF_WORLD_SIZE, WORLD_SIZE, WORLD_SIZE, 128, 128, 0x2ecc71)
             .setAltFillStyle(0x27ae60)
-            .setOutlineStyle();
+            .setOutlineStyle()
+            .setDepth(-10);
 
         var graphics = scene.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0xffffff, 1);
@@ -37,6 +38,7 @@
 
         Golf.spawnClubs(scene);
         Golf.createHole(scene);
+        Golf.createTerrains(scene);
 
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
