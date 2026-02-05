@@ -4,7 +4,7 @@
     var CLUB_TYPES = Golf.CLUB_TYPES;
 
     Golf.handleAiming = function (scene, p) {
-        var MAX_HIT_DISTANCE = 300;
+        var MAX_HIT_DISTANCE = 180;
         var CONE_ANGLE = 60;
         var playerX, playerY, ballDist, ballAngle, mouseAngle, angleDiff, isBallInCone;
         var isMouseDown = scene.input.activePointer.isDown;
@@ -124,10 +124,32 @@
                 var club = p.activeClub;
                 var distFactor = ballDist / MAX_HIT_DISTANCE;
                 var pwrMult = 1.0 - distFactor * 0.5;
-                var accuracyDeviation = distFactor * Math.PI;
+
+                // Terrain modifiers
+                var terrain = p.ball.currentTerrainType;
+                var terrainPowerMult = terrain && terrain.shotPowerMult ? terrain.shotPowerMult : 1.0;
+                var terrainAccuracyPenalty = terrain && terrain.shotAccuracyPenalty ? terrain.shotAccuracyPenalty : 0;
+
+                var accuracyDeviation = (distFactor + terrainAccuracyPenalty) * Math.PI;
                 var jitter = (Math.random() - 0.5) * accuracyDeviation;
 
-                if (distFactor >= 0.75) {
+                if (terrain && terrain.label === 'long_grass') {
+                    var roughText = scene.add.text(playerX, playerY - 40, 'ROUGH!', {
+                        family: 'Outfit',
+                        fontSize: '28px',
+                        fontStyle: '900',
+                        color: '#feca57',
+                        stroke: '#ffffff',
+                        strokeThickness: 4
+                    }).setOrigin(0.5).setDepth(100);
+                    scene.tweens.add({
+                        targets: roughText,
+                        y: playerY - 100,
+                        alpha: 0,
+                        duration: 1000,
+                        onComplete: function () { roughText.destroy(); }
+                    });
+                } else if (distFactor >= 0.75) {
                     var sliceText = scene.add.text(playerX, playerY - 40, 'SLICE!', {
                         family: 'Outfit',
                         fontSize: '28px',
@@ -147,7 +169,7 @@
 
                 var originalShotAngle = mouseAngle;
                 var finalShotAngle = originalShotAngle + jitter;
-                var finalForce = (p.power / 100) * club.power * pwrMult;
+                var finalForce = (p.power / 100) * club.power * pwrMult * terrainPowerMult;
 
                 scene.matter.body.applyForce(p.ball, p.ball.position, {
                     x: Math.cos(finalShotAngle) * finalForce,

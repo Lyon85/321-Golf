@@ -65,11 +65,24 @@
                 isStatic: true,
                 isSensor: true,
                 label: type.label,
+                height: 0,
                 collisionFilter: {
                     category: CAT_TERRAIN,
-                    mask: CAT_PLAYER | CAT_BALL
+                    mask: CAT_PLAYER | CAT_BALL | Golf.CAT_CAR
                 }
             });
+
+            // Block players and carts from entering water
+            if (type.label === 'water') {
+                scene.matter.add.rectangle(x, y, w, h, {
+                    isStatic: true,
+                    label: 'water_block',
+                    collisionFilter: {
+                        category: Golf.CAT_BUILDING,
+                        mask: CAT_PLAYER | Golf.CAT_CAR
+                    }
+                });
+            }
 
             // Use TileSprite for repeating pattern
             var rect = scene.add.tileSprite(x, y, w, h, type.label)
@@ -98,7 +111,7 @@
                     (bodyB.label === 'long_grass' || bodyB.label === 'water' ? bodyB : null);
                 var otherBody = terrainBody === bodyA ? bodyB : bodyA;
 
-                if (terrainBody && (otherBody.label === 'player' || otherBody.label === 'ball')) {
+                if (terrainBody && (otherBody.label === 'player' || otherBody.label === 'ball' || otherBody.label === 'cart')) {
                     applyTerrainEffect(scene, otherBody, terrainBody.label);
                 }
             });
@@ -113,7 +126,7 @@
                     (bodyB.label === 'long_grass' || bodyB.label === 'water' ? bodyB : null);
                 var otherBody = terrainBody === bodyA ? bodyB : bodyA;
 
-                if (terrainBody && (otherBody.label === 'player' || otherBody.label === 'ball')) {
+                if (terrainBody && (otherBody.label === 'player' || otherBody.label === 'ball' || otherBody.label === 'cart')) {
                     removeTerrainEffect(scene, otherBody);
                 }
             });
@@ -128,7 +141,10 @@
             body.baseFrictionAir = body.frictionAir;
         }
 
-        body.frictionAir = type.frictionAir;
+        if (body.label === 'ball') {
+            body.frictionAir = type.frictionAir;
+        }
+        body.currentTerrainType = type;
 
         if (body.label === 'ball' && terrainLabel === 'water') {
             handleWaterHazard(scene, body);
@@ -139,6 +155,7 @@
         if (body.baseFrictionAir !== undefined) {
             body.frictionAir = body.baseFrictionAir;
         }
+        body.currentTerrainType = null;
     }
 
     function handleWaterHazard(scene, ballBody) {

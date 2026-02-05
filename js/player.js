@@ -11,9 +11,10 @@
             friction: 0.1,
             frictionAir: 0.03,
             label: 'player',
+            height: 12,
             collisionFilter: {
                 category: CAT_PLAYER,
-                mask: CAT_BUILDING | CAT_DEFAULT | Golf.CAT_TERRAIN
+                mask: CAT_BUILDING | CAT_DEFAULT | Golf.CAT_TERRAIN | CAT_BALL | Golf.CAT_CAR
             }
         });
         pBody.baseFrictionAir = 0.03;
@@ -26,7 +27,7 @@
             label: 'ball',
             collisionFilter: {
                 category: CAT_BALL,
-                mask: CAT_BUILDING | CAT_DEFAULT | CAT_HOLE | Golf.CAT_TERRAIN
+                mask: CAT_BUILDING | CAT_DEFAULT | CAT_HOLE | Golf.CAT_TERRAIN | CAT_PLAYER | Golf.CAT_CAR
             }
         });
         bBody.baseFrictionAir = 0.01;

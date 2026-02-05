@@ -15,9 +15,10 @@
             restitution: 0.2,
             density: 0.01,
             label: 'cart',
+            height: 20,
             collisionFilter: {
                 category: CAT_CAR,
-                mask: CAT_BUILDING | CAT_PLAYER | CAT_BALL | CAT_DEFAULT | CAT_CAR
+                mask: CAT_BUILDING | CAT_PLAYER | CAT_BALL | CAT_DEFAULT | CAT_CAR | Golf.CAT_TERRAIN
             }
         });
 
@@ -39,6 +40,9 @@
     Golf.enterCart = function (p, cart) {
         p.driving = cart;
         p.sprite.setAlpha(0.7);
+        p.savedMask = p.body.collisionFilter.mask;
+        p.body.collisionFilter.mask = 0;
+        p.body.isSensor = true;
         if (!p.isAI) state.game.scene.scenes[0].speedometer.classList.remove('hidden');
     };
 
@@ -46,6 +50,8 @@
         var cart = p.driving;
         p.driving = null;
         p.sprite.setAlpha(1);
+        if (p.savedMask !== undefined) p.body.collisionFilter.mask = p.savedMask;
+        p.body.isSensor = false;
         if (!p.isAI) state.game.scene.scenes[0].speedometer.classList.add('hidden');
         var exitAngle = cart.body.angle + Math.PI / 2;
         state.game.scene.scenes[0].matter.body.setPosition(p.body, {
@@ -63,7 +69,13 @@
         var ly = Math.sin(sideAngle);
         var curVel = cart.body.velocity;
         var latVel = curVel.x * lx + curVel.y * ly;
-        var grip = 0.8; // Reduce lateral sliding
+
+        // Terrain handling modifiers
+        var terrain = cart.body.currentTerrainType;
+        var terrainGripMult = terrain && terrain.cartGripMult !== undefined ? terrain.cartGripMult : 1.0;
+        var terrainSpeedMult = terrain && terrain.cartMaxSpeedMult !== undefined ? terrain.cartMaxSpeedMult : 1.0;
+
+        var grip = 0.8 * terrainGripMult; // Reduce lateral sliding
 
         scene.matter.body.setVelocity(cart.body, {
             x: curVel.x - latVel * lx * grip,
@@ -79,12 +91,12 @@
             p.turboRamp = Math.max(0, p.turboRamp - 0.032);
         }
 
-        var baseMax = 8;
-        var turboBoost = 3.0;
+        var baseMax = 8 * terrainSpeedMult;
+        var turboBoost = 3.0 * terrainSpeedMult;
         var currentMax = baseMax + turboBoost * p.turboRamp;
 
-        var baseForce = 0.02;
-        var turboForceBoost = 0.008;
+        var baseForce = 0.02 * terrainSpeedMult;
+        var turboForceBoost = 0.008 * terrainSpeedMult;
         var force = baseForce + turboForceBoost * p.turboRamp;
 
         var torque = 1.6;

@@ -59,8 +59,9 @@
                 if (!holeBody || !ballBody) continue;
                 var ballSpeed = Math.sqrt(ballBody.velocity.x * ballBody.velocity.x + ballBody.velocity.y * ballBody.velocity.y);
                 if (ballSpeed > 6) continue;
+
                 var player = state.players.find(function (p) { return p.ball === ballBody; });
-                if (player) {
+                if (player && player.ballHeight < 5) {
                     scene.sinkCooldownFrames = 90;
                     Golf.onBallSunk(scene, player);
                 }

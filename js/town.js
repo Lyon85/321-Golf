@@ -14,6 +14,8 @@
             var h = Phaser.Math.Between(150, 500);
             scene.matter.add.rectangle(x, y, w, h, {
                 isStatic: true,
+                label: 'building',
+                height: 100,
                 collisionFilter: {
                     category: CAT_BUILDING,
                     mask: CAT_PLAYER | CAT_BALL | CAT_DEFAULT

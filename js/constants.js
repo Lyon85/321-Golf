@@ -17,7 +17,7 @@
     };
 
     Golf.TERRAIN_TYPES = {
-        LONG_GRASS: { name: 'Long Grass', color: 0x1e8449, frictionAir: 0.08, label: 'long_grass' },
-        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water' }
+        LONG_GRASS: { name: 'Long Grass', color: 0x1e8449, frictionAir: 0.08, label: 'long_grass', shotPowerMult: 0.6, shotAccuracyPenalty: 0.2, cartGripMult: 0.4, cartMaxSpeedMult: 0.75 },
+        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 }
     };
 })(typeof window !== 'undefined' ? window : this);

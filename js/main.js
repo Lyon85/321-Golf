@@ -130,6 +130,23 @@
             p.ballShadow.setScale(1 - p.ballHeight / 100);
 
             var bSpeed = Math.sqrt(p.ball.velocity.x * p.ball.velocity.x + p.ball.velocity.y * p.ball.velocity.y);
+
+            // Dynamic height-based collision
+            var baseMask = Golf.CAT_BUILDING | Golf.CAT_DEFAULT | Golf.CAT_HOLE;
+            var currentMask = baseMask;
+
+            if (p.ballHeight > 2) {
+                // In flight: Can hit players and carts (if below their height)
+                // but ignores terrain (clears grass/water)
+                if (p.ballHeight <= 12) currentMask |= Golf.CAT_PLAYER;
+                if (p.ballHeight <= 20) currentMask |= Golf.CAT_CAR;
+            } else {
+                // Grounded: Ghost through players and carts, but hit terrain
+                currentMask |= Golf.CAT_TERRAIN;
+            }
+
+            p.ball.collisionFilter.mask = currentMask;
+
             p.trail.emitting = bSpeed > 2;
 
             if (p.inventory.length < 2) {
