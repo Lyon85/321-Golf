@@ -35,7 +35,7 @@
             yoyo: true,
             repeat: -1
         });
-        Golf.spawnHole(scene, true);
+        Golf.spawnHole(scene);
 
         state.holeSensor = scene.matter.add.circle(state.hole.x, state.hole.y, HOLE_RADIUS, {
             isStatic: true,
@@ -71,17 +71,17 @@
         createHoleArrow(scene);
     };
 
-    Golf.spawnHole = function (scene, nearStart) {
-        nearStart = nearStart || false;
+    Golf.spawnHole = function (scene) {
         var HALF = 10000;
-        var hx, hy;
-        if (nearStart) {
-            hx = HALF + Phaser.Math.Between(-200, 200);
-            hy = HALF + Phaser.Math.Between(-200, 200);
-        } else {
+        var hx, hy, dist;
+        var minDistance = 3000;
+
+        do {
             hx = Phaser.Math.Between(1000, 19000);
             hy = Phaser.Math.Between(1000, 19000);
-        }
+            dist = Phaser.Math.Distance.Between(HALF, HALF, hx, hy);
+        } while (dist < minDistance);
+
         state.hole.setPosition(hx, hy);
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });

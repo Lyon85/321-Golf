@@ -165,9 +165,7 @@
 
             if (p.driving) {
                 p.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y);
-                p.ballSprite.setPosition(p.driving.body.position.x, p.driving.body.position.y);
                 scene.matter.body.setPosition(p.body, p.driving.body.position);
-                scene.matter.body.setPosition(p.ball, p.driving.body.position);
                 p.driving.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y);
                 p.driving.sprite.setRotation(p.driving.body.angle);
             }

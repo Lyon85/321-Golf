@@ -11,6 +11,27 @@
 
         if (isMouseDown) {
             if (!p.isAiming) {
+                if (!p.activeClub) {
+                    if (!scene.lastNoClubTime || scene.time.now - scene.lastNoClubTime > 1000) {
+                        var noClubText = scene.add.text(p.body.position.x, p.body.position.y - 40, 'NO CLUB!', {
+                            family: 'Outfit',
+                            fontSize: '24px',
+                            fontStyle: '900',
+                            color: '#ff4757',
+                            stroke: '#ffffff',
+                            strokeThickness: 4
+                        }).setOrigin(0.5).setDepth(100);
+                        scene.tweens.add({
+                            targets: noClubText,
+                            y: p.body.position.y - 80,
+                            alpha: 0,
+                            duration: 1000,
+                            onComplete: function () { noClubText.destroy(); }
+                        });
+                        scene.lastNoClubTime = scene.time.now;
+                    }
+                    return;
+                }
                 p.isAiming = true;
                 p.power = 0;
                 p.powerDir = 1;
@@ -61,16 +82,12 @@
 
             state.aimLine.clear();
             if (isBallInCone) {
-                var club = p.activeClub || CLUB_TYPES.IRON;
+                var club = p.activeClub;
                 var distFactor = ballDist / MAX_HIT_DISTANCE;
                 var pwrMult = 1.0 - distFactor * 0.5;
 
                 state.aimLine.lineStyle(3, 0xffffff, 0.6);
-                var shotAngle = Phaser.Math.Angle.Between(
-                    p.ball.position.x, p.ball.position.y,
-                    scene.input.activePointer.worldX,
-                    scene.input.activePointer.worldY
-                );
+                var shotAngle = mouseAngle;
                 var len = (p.power / 100) * 800 * club.power * 100 * pwrMult;
 
                 for (var i = 0; i < len; i += 25) {
@@ -104,7 +121,7 @@
                 angleDiff < Phaser.Math.DegToRad(CONE_ANGLE / 2);
 
             if (isBallInCone) {
-                var club = p.activeClub || CLUB_TYPES.IRON;
+                var club = p.activeClub;
                 var distFactor = ballDist / MAX_HIT_DISTANCE;
                 var pwrMult = 1.0 - distFactor * 0.5;
                 var accuracyDeviation = distFactor * Math.PI;
@@ -128,11 +145,7 @@
                     });
                 }
 
-                var originalShotAngle = Phaser.Math.Angle.Between(
-                    p.ball.position.x, p.ball.position.y,
-                    scene.input.activePointer.worldX,
-                    scene.input.activePointer.worldY
-                );
+                var originalShotAngle = mouseAngle;
                 var finalShotAngle = originalShotAngle + jitter;
                 var finalForce = (p.power / 100) * club.power * pwrMult;
 

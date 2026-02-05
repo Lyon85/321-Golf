@@ -39,7 +39,6 @@
     Golf.enterCart = function (p, cart) {
         p.driving = cart;
         p.sprite.setAlpha(0.7);
-        p.ballSprite.setAlpha(0);
         if (!p.isAI) state.game.scene.scenes[0].speedometer.classList.remove('hidden');
     };
 
@@ -47,7 +46,6 @@
         var cart = p.driving;
         p.driving = null;
         p.sprite.setAlpha(1);
-        p.ballSprite.setAlpha(1);
         if (!p.isAI) state.game.scene.scenes[0].speedometer.classList.add('hidden');
         var exitAngle = cart.body.angle + Math.PI / 2;
         state.game.scene.scenes[0].matter.body.setPosition(p.body, {
