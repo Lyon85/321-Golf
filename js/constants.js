@@ -17,6 +17,23 @@
         PUTTER: { name: 'Putter', power: 0.005, accuracy: 1.0, color: 0x0fbcf9, arc: 0 }
     };
 
+    Golf.PLAYER_STATES = {
+        IDLE: 'IDLE',
+        WALKING: 'WALKING',
+        SWINGING: 'SWINGING'
+    };
+
+    Golf.SWING_STATES = {
+        NONE: 'NONE',
+        BACKSWING: 'BACKSWING',
+        HIT: 'HIT'
+    };
+
+    Golf.DIRECTIONS = {
+        N: 'N', NE: 'NE', E: 'E', SE: 'SE',
+        S: 'S', SW: 'SW', W: 'W', NW: 'NW'
+    };
+
     Golf.TERRAIN_TYPES = {
         LONG_GRASS: { name: 'Long Grass', color: 0x1e8449, frictionAir: 0.08, label: 'long_grass', shotPowerMult: 0.6, shotAccuracyPenalty: 0.2, cartGripMult: 0.4, cartMaxSpeedMult: 0.75 },
         WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 }

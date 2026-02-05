@@ -33,6 +33,8 @@
                     return;
                 }
                 p.isAiming = true;
+                p.state = Golf.PLAYER_STATES.SWINGING;
+                p.swingState = Golf.SWING_STATES.BACKSWING;
                 p.power = 0;
                 p.powerDir = 1;
                 scene.powerMeterContainer.classList.remove('hidden');
@@ -176,6 +178,7 @@
                     y: Math.sin(finalShotAngle) * finalForce
                 });
                 p.lastSafePos = { x: p.ball.position.x, y: p.ball.position.y };
+                p.swingState = Golf.SWING_STATES.HIT;
 
                 // Ball flight animation (not for Putter)
                 if (club.name !== 'Putter' && p.power > 50) {
@@ -191,6 +194,8 @@
                         onComplete: function () {
                             p.ballInFlight = false;
                             p.ballHeight = 0;
+                            p.state = Golf.PLAYER_STATES.IDLE;
+                            p.swingState = Golf.SWING_STATES.NONE;
                         }
                     });
                 }
@@ -199,6 +204,11 @@
             }
 
             p.isAiming = false;
+            // If not in flight (e.g. putter or low power), reset state now
+            if (!p.ballInFlight) {
+                p.state = Golf.PLAYER_STATES.IDLE;
+                p.swingState = Golf.SWING_STATES.NONE;
+            }
             p.power = 0;
             scene.powerMeterContainer.classList.add('hidden');
             state.aimLine.clear();

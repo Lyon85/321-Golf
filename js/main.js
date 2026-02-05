@@ -55,6 +55,15 @@
         );
 
         scene.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,E,SHIFT,ONE,TWO');
+
+        state.players.forEach(function (p) {
+            p.debugText = scene.add.text(0, 0, '', {
+                fontSize: '12px',
+                fill: '#ffffff',
+                backgroundColor: '#000000bb'
+            }).setOrigin(0.5).setDepth(200);
+        });
+
         scene.cameras.main.startFollow(state.players[0].sprite, true, 0.1, 0.1);
 
         Golf.createGolfCart(scene, HALF_WORLD_SIZE + 200, HALF_WORLD_SIZE + 50);
@@ -122,6 +131,12 @@
             }
 
             p.sprite.setPosition(p.body.position.x, p.body.position.y);
+
+            // Update debug text
+            var debugInfo = p.state + " (" + p.direction + ")";
+            if (p.state === "SWINGING") debugInfo += "\n" + p.swingState;
+            p.debugText.setText(debugInfo);
+            p.debugText.setPosition(p.body.position.x, p.body.position.y + 40);
 
             p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y - p.ballHeight);
             p.ballSprite.setScale(1 + p.ballHeight / 20);

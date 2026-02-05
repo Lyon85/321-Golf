@@ -19,6 +19,21 @@
 
         var anyMove = keys.W || keys.S || keys.A || keys.D;
 
+        if (anyMove) {
+            p.state = Golf.PLAYER_STATES.WALKING;
+            // Determine 8-way direction
+            if (keys.W && keys.D) p.direction = Golf.DIRECTIONS.NE;
+            else if (keys.W && keys.A) p.direction = Golf.DIRECTIONS.NW;
+            else if (keys.S && keys.D) p.direction = Golf.DIRECTIONS.SE;
+            else if (keys.S && keys.A) p.direction = Golf.DIRECTIONS.SW;
+            else if (keys.W) p.direction = Golf.DIRECTIONS.N;
+            else if (keys.S) p.direction = Golf.DIRECTIONS.S;
+            else if (keys.A) p.direction = Golf.DIRECTIONS.W;
+            else if (keys.D) p.direction = Golf.DIRECTIONS.E;
+        } else if (p.state !== Golf.PLAYER_STATES.SWINGING) {
+            p.state = Golf.PLAYER_STATES.IDLE;
+        }
+
         if (p.isAiming && !anyMove) {
             scene.matter.body.setVelocity(p.body, { x: 0, y: 0 });
         } else {

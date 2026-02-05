@@ -59,7 +59,10 @@
             inventory: [],
             activeClub: null,
             trail: trail,
-            lastSafePos: { x: x + 60, y: y }
+            lastSafePos: { x: x + 60, y: y },
+            state: Golf.PLAYER_STATES.IDLE,
+            direction: Golf.DIRECTIONS.S,
+            swingState: Golf.SWING_STATES.NONE
         };
     };
 })(typeof window !== 'undefined' ? window : this);

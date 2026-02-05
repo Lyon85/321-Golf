@@ -139,12 +139,13 @@
                 setTimeout(function () { Golf.triggerStart(scene); }, 1000);
             }
         } else if (data.type === 'STATE_UPDATE') {
+            var scene = state.game.scene.scenes[0];
+            if (!scene) return;
+
             state.isMatchActive = data.matchActive;
             data.players.forEach(function (pData) {
                 var p = state.players[pData.id];
                 if (p) {
-                    var scene = state.game.scene.scenes[0];
-                    if (!scene) return;
                     scene.matter.body.setPosition(p.body, { x: pData.x, y: pData.y });
                     scene.matter.body.setAngle(p.body, pData.angle);
                     scene.matter.body.setVelocity(p.body, { x: 0, y: 0 });
@@ -155,7 +156,6 @@
             data.carts.forEach(function (cData) {
                 var cart = state.golfCarts[cData.id];
                 if (cart) {
-                    var scene = state.game.scene.scenes[0];
                     scene.matter.body.setPosition(cart.body, { x: cData.x, y: cData.y });
                     scene.matter.body.setAngle(cart.body, cData.angle);
                     scene.matter.body.setVelocity(cart.body, { x: 0, y: 0 });
@@ -164,7 +164,7 @@
             if (state.hole) {
                 state.hole.setPosition(data.hole.x, data.hole.y);
                 if (state.holeSensor) {
-                    Matter.Body.setPosition(state.holeSensor, { x: data.hole.x, y: data.hole.y });
+                    scene.matter.body.setPosition(state.holeSensor, { x: data.hole.x, y: data.hole.y });
                 }
             }
         }
