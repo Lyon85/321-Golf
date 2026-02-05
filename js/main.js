@@ -92,11 +92,29 @@
 
         Golf.updateHoleArrow(scene);
 
-        state.players.forEach(function (p) {
-            if (p.isAI) {
-                Golf.handleAIBehavior(scene, p);
+        if (state.isHost) {
+            Golf.broadcastState(scene);
+        } else {
+            Golf.sendGuestInput(scene.keys);
+        }
+
+        state.players.forEach(function (p, index) {
+            // Only the Host calculates physics/logic for AI and remote players
+            if (state.isHost) {
+                if (p.isAI) {
+                    Golf.handleAIBehavior(scene, p);
+                } else if (index === 0) {
+                    // Local player 1
+                    handleHumanInput(scene, p);
+                } else if (index === 1 && state.connection) {
+                    // Remote player 2 (the guest) handled on host via their inputs
+                    handleRemotePlayerInput(scene, p);
+                }
             } else {
-                handleHumanInput(scene, p);
+                // If guest, only handle local player (index 1) input to send to host
+                if (index === 1) {
+                    handleHumanInput(scene, p);
+                }
             }
 
             p.sprite.setPosition(p.body.position.x, p.body.position.y);
@@ -186,6 +204,13 @@
             Golf.handlePlayerMovement(scene, p);
             Golf.handleAiming(scene, p);
         }
+    }
+
+    function handleRemotePlayerInput(scene, p) {
+        if (!p.remoteKeys) return;
+        // Host uses Guest's keys to move the Guest's player object in the Host's physics world
+        Golf.handlePlayerMovement(scene, p, p.remoteKeys);
+        // TODO: Aiming for remote player
     }
 
     var config = {
