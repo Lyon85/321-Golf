@@ -140,6 +140,7 @@
                     x: Math.cos(finalShotAngle) * finalForce,
                     y: Math.sin(finalShotAngle) * finalForce
                 });
+                p.lastSafePos = { x: p.ball.position.x, y: p.ball.position.y };
 
                 scene.cameras.main.shake(200, 0.005);
             }

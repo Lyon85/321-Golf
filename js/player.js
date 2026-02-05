@@ -13,9 +13,10 @@
             label: 'player',
             collisionFilter: {
                 category: CAT_PLAYER,
-                mask: CAT_BUILDING | CAT_DEFAULT
+                mask: CAT_BUILDING | CAT_DEFAULT | Golf.CAT_TERRAIN
             }
         });
+        pBody.baseFrictionAir = 0.03;
         var pSprite = scene.add.rectangle(0, 0, 32, 48, color).setStrokeStyle(2, 0xffffff);
 
         var bBody = scene.matter.add.circle(x + 60, y, 8, {
@@ -25,9 +26,10 @@
             label: 'ball',
             collisionFilter: {
                 category: CAT_BALL,
-                mask: CAT_BUILDING | CAT_DEFAULT | CAT_HOLE
+                mask: CAT_BUILDING | CAT_DEFAULT | CAT_HOLE | Golf.CAT_TERRAIN
             }
         });
+        bBody.baseFrictionAir = 0.01;
         var bSprite = scene.add.circle(0, 0, 8, 0xffffff).setStrokeStyle(1, 0x000000).setDepth(5);
         var trail = scene.add.particles(0, 0, 'white', {
             follow: bSprite,
@@ -51,7 +53,8 @@
             aiTimer: 0,
             inventory: [],
             activeClub: null,
-            trail: trail
+            trail: trail,
+            lastSafePos: { x: x + 60, y: y }
         };
     };
 })(typeof window !== 'undefined' ? window : this);

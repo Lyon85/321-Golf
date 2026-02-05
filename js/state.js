@@ -14,6 +14,7 @@
         isWaitingToStart: true,
         aimLine: null,
         hitConeGraphics: null,
-        particles: null
+        particles: null,
+        terrains: []
     };
 })(typeof window !== 'undefined' ? window : this);
