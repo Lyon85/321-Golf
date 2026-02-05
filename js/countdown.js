@@ -25,6 +25,14 @@
         });
     };
 
+    Golf.triggerStart = function (scene) {
+        if (state.isWaitingToStart) {
+            state.isWaitingToStart = false;
+            if (scene.overlay) scene.overlay.style.display = 'none';
+            Golf.startCountdown(scene);
+        }
+    };
+
     Golf.setupStartTrigger = function (scene) {
         var startTrigger = function () {
             if (state.isWaitingToStart) {

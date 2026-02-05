@@ -123,7 +123,7 @@
             p.sprite.setPosition(p.body.position.x, p.body.position.y);
 
             p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y - p.ballHeight);
-            p.ballSprite.setScale(1 + p.ballHeight / 40);
+            p.ballSprite.setScale(1 + p.ballHeight / 20);
 
             p.ballShadow.setPosition(p.ball.position.x, p.ball.position.y);
             p.ballShadow.setVisible(p.ballHeight > 0);

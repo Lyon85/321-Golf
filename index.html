@@ -22,7 +22,7 @@
             <p><strong>1 / 2</strong>: Switch between Club Slot 1 and Slot 2</p>
             <p><strong>Left Click</strong>: Hold to Aim & Power, Release to Hit</p>
             <p><strong>Goal</strong>: Sink your ball in 10 holes before the AI!</p>
-            <div id="multiplayer-controls">
+            <div id="multiplayer-controls" style="display: none;">
                 <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 5px;">Share your ID with a friend, or paste
                     theirs below:</p>
                 <div class="lobby-section">
@@ -34,7 +34,7 @@
                     <button id="join-btn">Join Game</button>
                 </div>
             </div>
-            <p class="hint">Press SPACE or CLICK to Start</p>
+            <p id="lobby-status" class="hint">Waiting for Players (1/2)</p>
         </div>
         <div id="countdown" class="hidden">3</div>
         <div id="power-meter-container" class="hidden">

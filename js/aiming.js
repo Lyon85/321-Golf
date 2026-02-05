@@ -180,7 +180,7 @@
                 // Ball flight animation (not for Putter)
                 if (club.name !== 'Putter' && p.power > 50) {
                     var flightDuration = 800 + (p.power / 100) * 400;
-                    var maxH = (p.power / 100) * 40;
+                    var maxH = (p.power / 100) * 40 * (club.arc || 1);
                     p.ballInFlight = true;
                     scene.tweens.add({
                         targets: p,
