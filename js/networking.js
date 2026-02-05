@@ -1,9 +1,7 @@
 (function (global) {
     var Golf = global.Golf;
     var state = Golf.state;
-    var PREFIX = Golf.LOBBY_ROOM_PREFIX;
-
-    var currentRoomIndex = 1;
+    var myPersistentId = null;
 
     function updateLobbyUI(text) {
         var el = document.getElementById('lobby-status');
@@ -11,137 +9,175 @@
     }
 
     Golf.initMatchmaking = function () {
-        currentRoomIndex = 1;
-        tryJoinOrCreateRoom(currentRoomIndex);
+        // 1. Assign once per session
+        myPersistentId = "GOLF-" + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+        setupUI();
+        startHosting(myPersistentId);
     };
 
-    function tryJoinOrCreateRoom(index) {
-        var roomId = PREFIX + index;
-        updateLobbyUI("Searching for Match...");
+    function startHosting(id) {
+        if (state.peer) state.peer.destroy();
+        state.connection = null;
+        state.isHost = true;
+        state.myId = id;
 
-        var peer = new Peer(roomId);
-        state.peer = peer;
+        var p = new Peer(id);
+        state.peer = p;
 
-        peer.on('open', function (id) {
-            console.log("Started as HOST for: " + id);
-            state.isHost = true;
-            state.myId = id;
-            updateLobbyUI("Waiting for Players (1/2)");
-
-            peer.on('connection', function (conn) {
-                if (state.connection) {
-                    console.log("Room full! Rejecting guest.");
-                    conn.on('open', function () {
-                        conn.send({ type: 'ROOM_FULL' });
-                        setTimeout(function () { conn.close(); }, 500);
-                    });
-                    return;
-                }
-
-                console.log("Guest joined!");
-                state.connection = conn;
-                setupConnectionListeners(conn);
-
-                if (state.players[1]) state.players[1].isAI = false;
-                updateLobbyUI("Waiting for Players (2/2)");
-
-                var scene = state.game.scene.scenes[0];
-                if (scene) {
-                    state.connection.send({ type: 'START_GAME' });
-                    setTimeout(function () { Golf.triggerStart(scene); }, 1000);
-                }
-            });
+        p.on('open', function () {
+            var el = document.getElementById('my-id');
+            if (el) el.innerText = id;
+            updateLobbyUI("Sharing ID: " + id + " | Waiting for Friend...");
         });
 
-        peer.on('error', function (err) {
+        p.on('connection', function (conn) {
+            // Safety check
+            if (state.connection) {
+                conn.on('open', function () {
+                    conn.send({ type: 'ROOM_FULL' });
+                    setTimeout(function () { conn.close(); }, 500);
+                });
+                return;
+            }
+
+            console.log("Friend connected!");
+            state.connection = conn;
+            setupConnectionListeners(conn);
+            if (state.players[1]) state.players[1].isAI = false;
+
+            updateLobbyUI("Friend Joined! Match Starting...");
+            conn.send({ type: 'START_GAME' });
+
+            var scene = state.game.scene.scenes[0];
+            if (scene) Golf.triggerStart(scene);
+        });
+
+        p.on('error', function (err) {
             if (err.type === 'unavailable-id') {
-                console.log("Room " + index + " occupied, attempting to join...");
-                attemptJoinRoom(index);
-            } else {
-                console.error("Peer error:", err);
+                // Might happen if we refresh really fast, just generate a new one
+                myPersistentId = "GOLF-" + Math.random().toString(36).substring(2, 6).toUpperCase();
+                startHosting(myPersistentId);
             }
         });
     }
 
-    function attemptJoinRoom(index) {
-        var roomId = PREFIX + index;
-        var peer = new Peer(); // Anonymous peer to connect
-        state.peer = peer;
+    function setupUI() {
+        var joinBtn = document.getElementById('join-btn');
+        var copyBtn = document.getElementById('copy-id-btn');
+        var friendInput = document.getElementById('friend-id-input');
 
-        peer.on('open', function (id) {
-            var conn = peer.connect(roomId);
-            state.connection = conn;
-            state.isHost = false;
+        if (joinBtn) {
+            joinBtn.onclick = function () {
+                var targetId = friendInput.value.trim().toUpperCase();
+                if (targetId) attemptJoin(targetId);
+            };
+        }
+
+        if (copyBtn) {
+            copyBtn.onclick = function () {
+                navigator.clipboard.writeText(myPersistentId);
+                copyBtn.innerText = "COPIED!";
+                setTimeout(function () { copyBtn.innerText = "COPY"; }, 2000);
+            };
+        }
+    }
+
+    function attemptJoin(targetId) {
+        updateLobbyUI("Connecting to " + targetId + "...");
+
+        // CRITICAL: Stop hosting while we try to join as a guest
+        // This prevents the "Dual Peer" confusion
+        if (state.peer) state.peer.destroy();
+        state.peer = null;
+        state.connection = null;
+
+        var guestPeer = new Peer();
+        state.peer = guestPeer;
+
+        guestPeer.on('open', function () {
+            var conn = guestPeer.connect(targetId);
 
             var timeout = setTimeout(function () {
-                console.warn("Connection timeout for room " + index);
-                peer.destroy();
-                tryJoinOrCreateRoom(index + 1);
-            }, 5000);
+                updateLobbyUI("Join failed (Timeout). Returning to lobby...");
+                guestPeer.destroy();
+                startHosting(myPersistentId); // Return to our own lobby
+            }, 4000);
 
             conn.on('open', function () {
                 clearTimeout(timeout);
-                console.log("Connected to room " + index);
+                console.log("Success! Connected to " + targetId);
+                state.connection = conn;
+                state.isHost = false;
                 setupConnectionListeners(conn);
                 conn.send({ type: 'GUEST_JOINED' });
 
                 if (state.players[1]) state.players[1].isAI = false;
+                updateLobbyUI("Joined! Match Starting...");
+
                 var scene = state.game.scene.scenes[0];
                 if (scene && state.players[1]) {
                     scene.cameras.main.startFollow(state.players[1].sprite, true, 0.1, 0.1);
                 }
             });
 
-            conn.on('data', function (data) {
-                if (data.type === 'ROOM_FULL') {
-                    console.log("Room " + index + " is full, trying next...");
-                    peer.destroy();
-                    tryJoinOrCreateRoom(index + 1);
-                } else {
-                    handleHostStateUpdate(data);
-                }
-            });
-
-            conn.on('close', function () {
-                console.log("Host closed connection.");
-                location.reload();
+            conn.on('error', function (err) {
+                clearTimeout(timeout);
+                updateLobbyUI("ID not found or busy. Returning to your lobby...");
+                guestPeer.destroy();
+                setTimeout(function () { startHosting(myPersistentId); }, 1000);
             });
         });
     }
 
     function setupConnectionListeners(conn) {
         conn.on('data', function (data) {
-            if (state.isHost) {
-                handleGuestInput(data);
+            // Global handlers
+            if (data.type === 'ROOM_FULL') {
+                updateLobbyUI("That game is already full!");
+                if (!state.isHost) {
+                    if (state.peer) state.peer.destroy();
+                    startHosting(myPersistentId);
+                }
+            } else if (data.type === 'START_GAME') {
+                var scene = state.game.scene.scenes[0];
+                if (scene) Golf.triggerStart(scene);
             } else {
-                handleHostStateUpdate(data);
+                if (state.isHost) handleGuestInput(data);
+                else handleHostStateUpdate(data);
             }
         });
 
         conn.on('close', function () {
-            console.log("Connection closed.");
-            location.reload();
+            if (!state.isWaitingToStart) {
+                location.reload();
+            } else {
+                updateLobbyUI("Friend Left. Waiting...");
+                state.connection = null;
+                if (state.players[1]) state.players[1].isAI = true;
+                if (!state.isHost) {
+                    // If we were guest and host left, become host of our own ID again
+                    if (state.peer) state.peer.destroy();
+                    startHosting(myPersistentId);
+                }
+            }
         });
     }
 
     function handleGuestInput(data) {
         if (data.type === 'GUEST_INPUT') {
             var guest = state.players[1];
-            if (guest) guest.remoteKeys = data.keys;
+            if (guest) {
+                guest.remoteKeys = data.keys;
+                guest.remotePointer = data.pointer;
+            }
         }
     }
 
     function handleHostStateUpdate(data) {
-        if (data.type === 'START_GAME') {
-            updateLobbyUI("Waiting for Players (2/2)");
-            var scene = state.game.scene.scenes[0];
-            if (scene) {
-                setTimeout(function () { Golf.triggerStart(scene); }, 1000);
-            }
-        } else if (data.type === 'STATE_UPDATE') {
+        if (data.type === 'STATE_UPDATE') {
             var scene = state.game.scene.scenes[0];
             if (!scene) return;
-
             state.isMatchActive = data.matchActive;
             data.players.forEach(function (pData) {
                 var p = state.players[pData.id];
@@ -163,16 +199,14 @@
             });
             if (state.hole) {
                 state.hole.setPosition(data.hole.x, data.hole.y);
-                if (state.holeSensor) {
-                    scene.matter.body.setPosition(state.holeSensor, { x: data.hole.x, y: data.hole.y });
-                }
+                if (state.holeSensor) scene.matter.body.setPosition(state.holeSensor, { x: data.hole.x, y: data.hole.y });
             }
         }
     }
 
     Golf.broadcastState = function () {
         if (!state.connection || !state.isHost) return;
-        var gameData = {
+        state.connection.send({
             type: 'STATE_UPDATE',
             players: state.players.map(function (p, index) {
                 return {
@@ -185,23 +219,23 @@
             }),
             hole: { x: state.hole.x, y: state.hole.y },
             matchActive: state.isMatchActive
-        };
-        state.connection.send(gameData);
-    };
-
-    Golf.sendGuestInput = function (keys) {
-        if (!state.connection || state.isHost) return;
-        state.connection.send({
-            type: 'GUEST_INPUT',
-            keys: {
-                W: keys.W.isDown, A: keys.A.isDown, S: keys.S.isDown, D: keys.D.isDown,
-                SPACE: keys.SPACE.isDown, SHIFT: keys.SHIFT.isDown, E: keys.E.isDown
-            }
         });
     };
 
-    window.addEventListener('load', function () {
-        Golf.initMatchmaking();
-    });
+    Golf.sendGuestInput = function (scene) {
+        if (state.connection && !state.isHost) {
+            var keys = scene.keys;
+            var pointer = scene.input.activePointer;
+            state.connection.send({
+                type: 'GUEST_INPUT',
+                keys: {
+                    W: keys.W.isDown, A: keys.A.isDown, S: keys.S.isDown, D: keys.D.isDown,
+                    SPACE: keys.SPACE.isDown, SHIFT: keys.SHIFT.isDown, E: keys.E.isDown
+                },
+                pointer: { worldX: pointer.worldX, worldY: pointer.worldY, isDown: pointer.isDown }
+            });
+        }
+    };
 
+    window.addEventListener('load', function () { Golf.initMatchmaking(); });
 })(typeof window !== 'undefined' ? window : this);

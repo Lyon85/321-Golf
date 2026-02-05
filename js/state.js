@@ -12,6 +12,7 @@
         currentHoleIndex: 0,
         isMatchActive: false,
         isWaitingToStart: true,
+        playerReady: [false, false], // [P1 ready, P2/AI ready]
         aimLine: null,
         hitConeGraphics: null,
         particles: null,

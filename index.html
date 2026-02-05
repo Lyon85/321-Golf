@@ -22,19 +22,23 @@
             <p><strong>1 / 2</strong>: Switch between Club Slot 1 and Slot 2</p>
             <p><strong>Left Click</strong>: Hold to Aim & Power, Release to Hit</p>
             <p><strong>Goal</strong>: Sink your ball in 10 holes before the AI!</p>
-            <div id="multiplayer-controls" style="display: none;">
-                <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 5px;">Share your ID with a friend, or paste
-                    theirs below:</p>
+            <div id="multiplayer-controls">
+                <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 5px;">Share your ID with a friend to play
+                    together:</p>
+
                 <div class="lobby-section">
-                    <label>My ID: <span id="my-id">Loading...</span></label>
+                    <label>My ID: <span id="my-id">...</span></label>
                     <button id="copy-id-btn">Copy</button>
                 </div>
-                <div class="lobby-section">
-                    <input type="text" id="friend-id-input" placeholder="Friend's ID">
+
+                <div class="lobby-section"
+                    style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <input type="text" id="friend-id-input" placeholder="GOLF-XXXX">
                     <button id="join-btn">Join Game</button>
                 </div>
             </div>
-            <p id="lobby-status" class="hint">Waiting for Players (1/2)</p>
+            <p id="lobby-status" class="hint">Waiting for Players</p>
+            <p id="ready-status" class="hint hidden"></p>
         </div>
         <div id="countdown" class="hidden">3</div>
         <div id="power-meter-container" class="hidden">
@@ -53,6 +57,8 @@
         </div>
     </div>
     <script src="js/constants.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/assets.js"></script>
     <script src="js/state.js"></script>
     <script src="js/player.js"></script>
     <script src="js/clubs.js"></script>

@@ -73,20 +73,41 @@
     };
 
     Golf.spawnHole = function (scene) {
-        var HALF = 10000;
-        var hx, hy, dist;
-        var minDistance = 3000;
+        var config = Golf.MAP_CONFIG;
+        var worldWidth = config.cols * config.tileSize;
+        var worldHeight = config.rows * config.tileSize;
 
+        // Use player spawn as reference for minimum distance
+        var refX = state.spawnPoint ? state.spawnPoint.x : worldWidth / 2;
+        var refY = state.spawnPoint ? state.spawnPoint.y : worldHeight / 2;
+
+        var hx, hy, dist;
+        // Dynamic min distance: 30% of map width or at least 500px
+        var minDistance = Math.max(500, worldWidth * 0.3);
+        var margin = 50; // Keep away from the very edge of tiles
+
+        var attempts = 0;
         do {
-            hx = Phaser.Math.Between(1000, 19000);
-            hy = Phaser.Math.Between(1000, 19000);
-            dist = Phaser.Math.Distance.Between(HALF, HALF, hx, hy);
-        } while (dist < minDistance);
+            hx = Phaser.Math.Between(margin, worldWidth - margin);
+            hy = Phaser.Math.Between(margin, worldHeight - margin);
+            dist = Phaser.Math.Distance.Between(refX, refY, hx, hy);
+
+            // Check if this spot is on water
+            var gridC = Math.floor(hx / config.tileSize);
+            var gridR = Math.floor(hy / config.tileSize);
+            var isWater = false;
+            if (state.mapGrid && state.mapGrid[gridR] && state.mapGrid[gridR][gridC]) {
+                isWater = state.mapGrid[gridR][gridC].type === 'water';
+            }
+
+            attempts++;
+        } while ((dist < minDistance || isWater) && attempts < 100);
 
         state.hole.setPosition(hx, hy);
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
+        console.log("Hole spawned at: " + hx + ", " + hy + " (dist from spawn: " + dist.toFixed(0) + ")");
     };
 
     Golf.updateHoleArrow = function (scene) {

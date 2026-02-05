@@ -11,6 +11,18 @@
     Golf.CAT_TERRAIN = 0x0080;
     Golf.LOBBY_ROOM_PREFIX = '321golf-room-';
 
+    // Elevation Constants
+    Golf.SLOPE_FORCE_MULT = 0.0003;
+    Golf.ELEVATION_GRID_SIZE = 512; // Resolution of height visuals
+    // Colors from Valley to Peak
+    Golf.ELEVATION_COLORS = [
+        0x1b5e20, // -1.0 (Deep Valley)
+        0x2e7d32, // -0.5 (Low)
+        0x4caf50, //  0.0 (Flat)
+        0x8bc34a, //  0.5 (Hill)
+        0xd4e157  //  1.0 (Peak)
+    ];
+
     Golf.CLUB_TYPES = {
         DRIVER: { name: 'Driver', power: 0.015, accuracy: 0.7, color: 0xffd32a, arc: 1.5 },
         IRON: { name: 'Iron', power: 0.009, accuracy: 0.95, color: 0xff3f34, arc: 1.0 },
@@ -20,7 +32,8 @@
     Golf.PLAYER_STATES = {
         IDLE: 'IDLE',
         WALKING: 'WALKING',
-        SWINGING: 'SWINGING'
+        SWINGING: 'SWINGING',
+        SWIMMING: 'SWIMMING'
     };
 
     Golf.SWING_STATES = {
@@ -35,7 +48,9 @@
     };
 
     Golf.TERRAIN_TYPES = {
-        LONG_GRASS: { name: 'Long Grass', color: 0x1e8449, frictionAir: 0.08, label: 'long_grass', shotPowerMult: 0.6, shotAccuracyPenalty: 0.2, cartGripMult: 0.4, cartMaxSpeedMult: 0.75 },
+        GRASS: { name: 'Grass', color: 0x2ecc71, frictionAir: 0.015, label: 'grass' },
+        ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 0.05, label: 'rough' },
+        SAND: { name: 'Sand', color: 0xf1c40f, frictionAir: 0.2, label: 'sand' },
         WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 }
     };
 })(typeof window !== 'undefined' ? window : this);

@@ -36,27 +36,24 @@
     Golf.setupStartTrigger = function (scene) {
         var startTrigger = function () {
             if (state.isWaitingToStart) {
-                state.isWaitingToStart = false;
-                if (scene.overlay) scene.overlay.style.display = 'none';
-                Golf.startCountdown(scene);
+                // In single player, just trigger start. 
+                // Multiplayer auto-starts on connection now.
+                Golf.triggerStart(scene);
             }
         };
         window.addEventListener('keydown', function (e) {
             if (e.code === 'Space') {
-                // Don't start if typing in an input
                 if (document.activeElement.tagName === 'INPUT') return;
                 startTrigger();
             }
         });
-        scene.overlay.addEventListener('click', function (e) {
-            // Don't start if clicking on multiplayer controls or its children
-            var controls = document.getElementById('multiplayer-controls');
-            if (controls && controls.contains(e.target)) return;
-
-            // Also ignore inputs and buttons just in case
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-
-            startTrigger();
-        });
+        if (scene.overlay) {
+            scene.overlay.addEventListener('click', function (e) {
+                var controls = document.getElementById('multiplayer-controls');
+                if (controls && controls.contains(e.target)) return;
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+                startTrigger();
+            });
+        }
     };
 })(typeof window !== 'undefined' ? window : this);

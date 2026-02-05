@@ -15,6 +15,9 @@
         if (p.isAiming) {
             force *= 0.25;
             speedCap *= 0.35;
+        } else if (p.state === Golf.PLAYER_STATES.SWIMMING) {
+            force *= 0.4;
+            speedCap *= 0.6;
         }
 
         var anyMove = keys.W || keys.S || keys.A || keys.D;

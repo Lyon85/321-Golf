@@ -3,16 +3,20 @@
     var state = Golf.state;
     var CLUB_TYPES = Golf.CLUB_TYPES;
 
-    Golf.handleAiming = function (scene, p) {
+    Golf.handleAiming = function (scene, p, pointer) {
         var MAX_HIT_DISTANCE = 180;
         var CONE_ANGLE = 60;
         var playerX, playerY, ballDist, ballAngle, mouseAngle, angleDiff, isBallInCone;
-        var isMouseDown = scene.input.activePointer.isDown;
+
+        // Use provided pointer (remote) or scene active pointer (local)
+        var activePointer = pointer || scene.input.activePointer;
+        var isMouseDown = activePointer.isDown;
+        var isLocal = !pointer;
 
         if (isMouseDown) {
             if (!p.isAiming) {
                 if (!p.activeClub) {
-                    if (!scene.lastNoClubTime || scene.time.now - scene.lastNoClubTime > 1000) {
+                    if (isLocal && (!scene.lastNoClubTime || scene.time.now - scene.lastNoClubTime > 1000)) {
                         var noClubText = scene.add.text(p.body.position.x, p.body.position.y - 40, 'NO CLUB!', {
                             family: 'Outfit',
                             fontSize: '24px',
@@ -37,37 +41,40 @@
                 p.swingState = Golf.SWING_STATES.BACKSWING;
                 p.power = 0;
                 p.powerDir = 1;
-                scene.powerMeterContainer.classList.remove('hidden');
+                if (isLocal) scene.powerMeterContainer.classList.remove('hidden');
             }
 
             p.power += 1.25 * p.powerDir;
             if (p.power >= 100 || p.power <= 0) p.powerDir *= -1;
-            scene.powerMeterFill.style.width = p.power + '%';
+            if (isLocal) scene.powerMeterFill.style.width = p.power + '%';
 
             var playerX = p.body.position.x;
             var playerY = p.body.position.y;
             var mouseAngle = Phaser.Math.Angle.Between(
                 playerX,
                 playerY,
-                scene.input.activePointer.worldX,
-                scene.input.activePointer.worldY
+                activePointer.worldX,
+                activePointer.worldY
             );
 
-            state.hitConeGraphics.clear();
-            state.hitConeGraphics.fillStyle(0xffffff, 0.15);
-            state.hitConeGraphics.beginPath();
-            state.hitConeGraphics.moveTo(playerX, playerY);
-            state.hitConeGraphics.arc(
-                playerX,
-                playerY,
-                MAX_HIT_DISTANCE,
-                mouseAngle - Phaser.Math.DegToRad(CONE_ANGLE / 2),
-                mouseAngle + Phaser.Math.DegToRad(CONE_ANGLE / 2)
-            );
-            state.hitConeGraphics.closePath();
-            state.hitConeGraphics.fill();
-            state.hitConeGraphics.lineStyle(2, 0xffffff, 0.3);
-            state.hitConeGraphics.strokePath();
+            // Only draw cone for local player
+            if (isLocal) {
+                state.hitConeGraphics.clear();
+                state.hitConeGraphics.fillStyle(0xffffff, 0.15);
+                state.hitConeGraphics.beginPath();
+                state.hitConeGraphics.moveTo(playerX, playerY);
+                state.hitConeGraphics.arc(
+                    playerX,
+                    playerY,
+                    MAX_HIT_DISTANCE,
+                    mouseAngle - Phaser.Math.DegToRad(CONE_ANGLE / 2),
+                    mouseAngle + Phaser.Math.DegToRad(CONE_ANGLE / 2)
+                );
+                state.hitConeGraphics.closePath();
+                state.hitConeGraphics.fill();
+                state.hitConeGraphics.lineStyle(2, 0xffffff, 0.3);
+                state.hitConeGraphics.strokePath();
+            }
 
             var ballDist = Phaser.Math.Distance.Between(
                 playerX, playerY,
@@ -82,23 +89,25 @@
                 ballDist < MAX_HIT_DISTANCE &&
                 angleDiff < Phaser.Math.DegToRad(CONE_ANGLE / 2);
 
-            state.aimLine.clear();
-            if (isBallInCone) {
-                var club = p.activeClub;
-                var distFactor = ballDist / MAX_HIT_DISTANCE;
-                var pwrMult = 1.0 - distFactor * 0.5;
+            if (isLocal) {
+                state.aimLine.clear();
+                if (isBallInCone) {
+                    var club = p.activeClub;
+                    var distFactor = ballDist / MAX_HIT_DISTANCE;
+                    var pwrMult = 1.0 - distFactor * 0.5;
 
-                state.aimLine.lineStyle(3, 0xffffff, 0.6);
-                var shotAngle = mouseAngle;
-                var len = (p.power / 100) * 800 * club.power * 100 * pwrMult;
+                    state.aimLine.lineStyle(3, 0xffffff, 0.6);
+                    var shotAngle = mouseAngle;
+                    var len = (p.power / 100) * 800 * club.power * 100 * pwrMult;
 
-                for (var i = 0; i < len; i += 25) {
-                    state.aimLine.lineBetween(
-                        p.ball.position.x + Math.cos(shotAngle) * i,
-                        p.ball.position.y + Math.sin(shotAngle) * i,
-                        p.ball.position.x + Math.cos(shotAngle) * (i + 12),
-                        p.ball.position.y + Math.sin(shotAngle) * (i + 12)
-                    );
+                    for (var i = 0; i < len; i += 25) {
+                        state.aimLine.lineBetween(
+                            p.ball.position.x + Math.cos(shotAngle) * i,
+                            p.ball.position.y + Math.sin(shotAngle) * i,
+                            p.ball.position.x + Math.cos(shotAngle) * (i + 12),
+                            p.ball.position.y + Math.sin(shotAngle) * (i + 12)
+                        );
+                    }
                 }
             }
         } else if (p.isAiming) {
@@ -114,8 +123,8 @@
             );
             mouseAngle = Phaser.Math.Angle.Between(
                 playerX, playerY,
-                scene.input.activePointer.worldX,
-                scene.input.activePointer.worldY
+                activePointer.worldX,
+                activePointer.worldY
             );
             angleDiff = Math.abs(Phaser.Math.Angle.Wrap(ballAngle - mouseAngle));
             isBallInCone =
@@ -127,29 +136,33 @@
                 var distFactor = ballDist / MAX_HIT_DISTANCE;
                 var pwrMult = 1.0 - distFactor * 0.5;
 
-                // Terrain modifiers
-                var terrain = p.ball.currentTerrainType;
-                var terrainPowerMult = terrain && terrain.shotPowerMult ? terrain.shotPowerMult : 1.0;
-                var terrainAccuracyPenalty = terrain && terrain.shotAccuracyPenalty ? terrain.shotAccuracyPenalty : 0;
+                // Dynamic Terrain modifiers
+                var tile = Golf.getTileAt(p.ball.position.x, p.ball.position.y);
+                var terrain = Golf.TERRAIN_TYPES[tile.type.toUpperCase()] || { shotPowerMult: 1.0, shotAccuracyPenalty: 0 };
+
+                var terrainPowerMult = terrain.shotPowerMult || 1.0;
+                var terrainAccuracyPenalty = terrain.shotAccuracyPenalty || 0;
 
                 var accuracyDeviation = (distFactor + terrainAccuracyPenalty) * Math.PI;
                 var jitter = (Math.random() - 0.5) * accuracyDeviation;
 
-                if (terrain && terrain.label === 'long_grass') {
-                    var roughText = scene.add.text(playerX, playerY - 40, 'ROUGH!', {
+                if (tile.type === 'rough' || tile.type === 'sand') {
+                    var label = tile.type === 'rough' ? 'ROUGH!' : 'SAND!';
+                    var color = tile.type === 'rough' ? '#feca57' : '#ff9f43';
+                    var txt = scene.add.text(playerX, playerY - 40, label, {
                         family: 'Outfit',
                         fontSize: '28px',
                         fontStyle: '900',
-                        color: '#feca57',
+                        color: color,
                         stroke: '#ffffff',
                         strokeThickness: 4
                     }).setOrigin(0.5).setDepth(100);
                     scene.tweens.add({
-                        targets: roughText,
+                        targets: txt,
                         y: playerY - 100,
                         alpha: 0,
                         duration: 1000,
-                        onComplete: function () { roughText.destroy(); }
+                        onComplete: function () { txt.destroy(); }
                     });
                 } else if (distFactor >= 0.75) {
                     var sliceText = scene.add.text(playerX, playerY - 40, 'SLICE!', {
@@ -183,24 +196,27 @@
                 // Ball flight animation (not for Putter)
                 if (club.name !== 'Putter' && p.power > 50) {
                     var flightDuration = 800 + (p.power / 100) * 400;
-                    var maxH = (p.power / 100) * 40 * (club.arc || 1);
-                    p.ballInFlight = true;
-                    scene.tweens.add({
-                        targets: p,
-                        ballHeight: maxH,
-                        duration: flightDuration / 2,
-                        ease: 'Quad.out',
-                        yoyo: true,
-                        onComplete: function () {
-                            p.ballInFlight = false;
-                            p.ballHeight = 0;
-                            p.state = Golf.PLAYER_STATES.IDLE;
-                            p.swingState = Golf.SWING_STATES.NONE;
-                        }
-                    });
+                    var arc = club.arc !== undefined ? club.arc : 1.0;
+                    if (arc > 0) {
+                        var maxH = (p.power / 100) * 40 * arc;
+                        p.ballInFlight = true;
+                        scene.tweens.add({
+                            targets: p,
+                            ballHeight: maxH,
+                            duration: flightDuration / 2,
+                            ease: 'Quad.out',
+                            yoyo: true,
+                            onComplete: function () {
+                                p.ballInFlight = false;
+                                p.ballHeight = 0;
+                                p.state = Golf.PLAYER_STATES.IDLE;
+                                p.swingState = Golf.SWING_STATES.NONE;
+                            }
+                        });
+                    }
                 }
 
-                scene.cameras.main.shake(200, 0.005);
+                if (isLocal) scene.cameras.main.shake(200, 0.005);
             }
 
             p.isAiming = false;
@@ -210,9 +226,11 @@
                 p.swingState = Golf.SWING_STATES.NONE;
             }
             p.power = 0;
-            scene.powerMeterContainer.classList.add('hidden');
-            state.aimLine.clear();
-            state.hitConeGraphics.clear();
+            if (isLocal) {
+                scene.powerMeterContainer.classList.add('hidden');
+                state.aimLine.clear();
+                state.hitConeGraphics.clear();
+            }
         }
     };
 })(typeof window !== 'undefined' ? window : this);
