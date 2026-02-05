@@ -38,7 +38,7 @@
                 scene.powerMeterContainer.classList.remove('hidden');
             }
 
-            p.power += 2.5 * p.powerDir;
+            p.power += 1.25 * p.powerDir;
             if (p.power >= 100 || p.power <= 0) p.powerDir *= -1;
             scene.powerMeterFill.style.width = p.power + '%';
 
