@@ -93,7 +93,10 @@
         Golf.updateHoleArrow(scene);
 
         if (state.isHost) {
-            Golf.broadcastState(scene);
+            // Broadcast at ~30fps to save bandwidth and prevent buffer overflow
+            if (scene.time.now % 32 < 16) {
+                Golf.broadcastState(scene);
+            }
         } else {
             Golf.sendGuestInput(scene.keys);
         }

@@ -127,12 +127,17 @@
             data.players.forEach(function (pData) {
                 var p = state.players[pData.id];
                 if (p) {
-                    // Force position for remote players/balls
-                    // In a more advanced version, we'd use interpolation
-                    Matter.Body.setPosition(p.body, { x: pData.x, y: pData.y });
-                    Matter.Body.setAngle(p.body, pData.angle);
-                    Matter.Body.setPosition(p.ball, { x: pData.ballX, y: pData.ballY });
-                    Matter.Body.setVelocity(p.ball, pData.ballVel);
+                    // Use the scene's matter reference
+                    var scene = state.game.scene.scenes[0];
+                    if (!scene) return;
+
+                    // Force the physics body to the exact spot the host says
+                    scene.matter.body.setPosition(p.body, { x: pData.x, y: pData.y });
+                    scene.matter.body.setAngle(p.body, pData.angle);
+                    scene.matter.body.setVelocity(p.body, { x: 0, y: 0 }); // Zero out local velocity to prevent jitter
+
+                    scene.matter.body.setPosition(p.ball, { x: pData.ballX, y: pData.ballY });
+                    scene.matter.body.setVelocity(p.ball, pData.ballVel || { x: 0, y: 0 });
                 }
             });
 
@@ -140,8 +145,10 @@
             data.carts.forEach(function (cData) {
                 var cart = state.golfCarts[cData.id];
                 if (cart) {
-                    Matter.Body.setPosition(cart.body, { x: cData.x, y: cData.y });
-                    Matter.Body.setAngle(cart.body, cData.angle);
+                    var scene = state.game.scene.scenes[0];
+                    scene.matter.body.setPosition(cart.body, { x: cData.x, y: cData.y });
+                    scene.matter.body.setAngle(cart.body, cData.angle);
+                    scene.matter.body.setVelocity(cart.body, { x: 0, y: 0 });
                 }
             });
 
