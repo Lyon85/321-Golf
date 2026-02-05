@@ -16,8 +16,14 @@
         state.connection = conn;
         setupConnectionListeners(conn);
 
+        // Disable AI for the second player when a human joins
+        if (state.players[1]) {
+            state.players[1].isAI = false;
+        }
+
         // Hide UI when connected
         document.getElementById('multiplayer-controls').style.display = 'none';
+        document.getElementById('my-id').innerText = "Friend Joined!";
     });
 
     Golf.joinGame = function (friendId) {
@@ -27,6 +33,17 @@
         state.isHost = false;
         state.connection = conn;
         setupConnectionListeners(conn);
+
+        // Set guest player (player 1) to not be AI
+        if (state.players[1]) {
+            state.players[1].isAI = false;
+        }
+
+        // Guest follows their own player (index 1)
+        var scene = state.game.scene.scenes[0];
+        if (scene && state.players[1]) {
+            scene.cameras.main.startFollow(state.players[1].sprite, true, 0.1, 0.1);
+        }
 
         document.getElementById('multiplayer-controls').style.display = 'none';
         document.getElementById('my-id').innerText = "Connected!";

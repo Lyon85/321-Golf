@@ -216,11 +216,14 @@ body {
 
 #my-id {
     color: var(--accent);
-    font-weight: 700;
+    font-weight: 900;
     font-family: monospace;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 4px 8px;
-    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    font-size: 1.1rem;
+    letter-spacing: 1px;
 }
 
 #friend-id-input {
@@ -240,7 +243,8 @@ body {
     background: rgba(255, 255, 255, 0.15);
 }
 
-#join-btn, #copy-id-btn {
+#join-btn,
+#copy-id-btn {
     background: var(--primary);
     color: white;
     border: none;
@@ -251,12 +255,14 @@ body {
     transition: all 0.2s;
 }
 
-#join-btn:hover, #copy-id-btn:hover {
+#join-btn:hover,
+#copy-id-btn:hover {
     transform: translateY(-2px);
     filter: brightness(1.1);
 }
 
-#join-btn:active, #copy-id-btn:active {
+#join-btn:active,
+#copy-id-btn:active {
     transform: translateY(0);
 }
 
