@@ -21,19 +21,38 @@ const CLUB_TYPES = [
     { name: 'Wedge', color: 0xffa502 }
 ];
 
-function generateClubs(count, width, height) {
+function generateFixedClubs(width, height) {
+    console.log(`[Server] Generating clubs for map size: ${width}x${height}`);
     const clubs = [];
-    const margin = 50;
-    for (let i = 0; i < count; i++) {
-        const typeIndex = Math.floor(Math.random() * CLUB_TYPES.length);
-        clubs.push({
-            id: i,
-            x: Math.floor(Math.random() * (width - margin * 2)) + margin,
-            y: Math.floor(Math.random() * (height - margin * 2)) + margin,
-            type: CLUB_TYPES[typeIndex],
-            taken: false
-        });
-    }
+    const margin = 100; // Keep away from extreme edges
+    let idCounter = 0;
+
+    const definitions = [
+        { type: 'Driver', count: 3 },
+        { type: 'Iron', count: 3 },
+        { type: 'Putter', count: 3 }
+    ];
+
+    definitions.forEach(def => {
+        // Find the matching type object from constants
+        const typeObj = CLUB_TYPES.find(ct => ct.name === def.type);
+        if (!typeObj) {
+            console.error(`[Server] Club type '${def.type}' not found in server constants!`);
+            return;
+        }
+
+        for (let i = 0; i < def.count; i++) {
+            clubs.push({
+                id: idCounter++,
+                x: Math.floor(Math.random() * (width - margin * 2)) + margin,
+                y: Math.floor(Math.random() * (height - margin * 2)) + margin,
+                type: typeObj,
+                taken: false
+            });
+        }
+    });
+
+    console.log(`[Server] Generated ${clubs.length} clubs.`);
     return clubs;
 }
 
@@ -45,28 +64,51 @@ io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
     socket.on('createRoom', () => {
-        const code = generateRoomCode();
-        rooms[code] = {
-            players: {},
-            carts: [],
-            clubs: generateClubs(60, 4000, 4000), // Default map size assumptions
-            started: false
-        };
-        socket.join(code);
+        try {
+            const code = generateRoomCode();
+            console.log(`[Server] Creating room ${code} for host ${socket.id}`);
 
-        // Host is Player 0
-        rooms[code].players[socket.id] = {
-            id: socket.id,
-            playerIndex: 0,
-            x: 0, y: 0,
-            flipX: false, anim: 'idle',
-            driving: null
-        };
+            const clubs = generateFixedClubs(5000, 1500);
+            console.log(`[Server] Clubs generated: ${clubs ? clubs.length : 'NULL'}`);
+            // Verify serializability
+            try {
+                JSON.stringify(clubs);
+            } catch (jsonErr) {
+                console.error('[Server] Club data is not serializable!', jsonErr);
+            }
 
-        socket.emit('roomCreated', code);
-        socket.emit('assignPlayer', 0); // Host is P0
+            rooms[code] = {
+                players: {},
+                carts: [],
+                // Map Config matched to client (20 cols * 250 tile = 5000, 6 rows * 250 = 1500)
+                clubs: clubs,
+                started: false
+            };
+            socket.join(code);
 
-        console.log(`Room ${code} created by ${socket.id}`);
+            // Host is Player 0
+            rooms[code].players[socket.id] = {
+                id: socket.id,
+                playerIndex: 0,
+                x: 0, y: 0,
+                flipX: false, anim: 'idle',
+                driving: null
+            };
+
+            socket.emit('roomCreated', code);
+            console.log(`[Server] Emitted roomCreated to ${socket.id}`);
+
+            socket.emit('assignPlayer', 0); // Host is P0
+            console.log(`[Server] Emitted assignPlayer to ${socket.id}`);
+
+            socket.emit('currentClubs', rooms[code].clubs); // Send clubs to host
+            console.log(`[Server] Emitted currentClubs (${rooms[code].clubs.length} items) to ${socket.id}`);
+
+            console.log(`Room ${code} created by ${socket.id}`);
+        } catch (err) {
+            console.error('[Server] Error in createRoom:', err);
+            socket.emit('errorMsg', 'Server error creating room: ' + err.message);
+        }
     });
 
     socket.on('joinRoom', (code) => {
@@ -116,6 +158,11 @@ io.on('connection', (socket) => {
                 room.started = true;
                 io.to(code).emit('gameStart');
                 console.log(`Room ${code} Game Started`);
+            }
+
+            // Sync Hole if exists
+            if (room.holePosition) {
+                socket.emit('holeUpdate', room.holePosition);
             }
 
         } else {
@@ -169,6 +216,26 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle Hole Sync
+    socket.on('holeUpdate', (pos) => {
+        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        if (code && rooms[code]) {
+            rooms[code].holePosition = pos; // Persist for new joiners
+            socket.to(code).emit('holeUpdate', pos); // Broadcast to others
+        }
+    });
+
+    socket.on('requestNewHole', () => {
+        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        if (code && rooms[code]) {
+            // Forward to Host (Player 0)
+            const hostId = Object.keys(rooms[code].players).find(id => rooms[code].players[id].playerIndex === 0);
+            if (hostId) {
+                io.to(hostId).emit('forceSpawnHole');
+            }
+        }
+    });
+
     socket.on('disconnect', () => {
         // Find room
         let foundCode = null;
@@ -193,4 +260,5 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log('--- SERVER RESTARTED with CLUB FIXES (v3) ---'); // Version flag
 });

@@ -6,7 +6,7 @@
     Golf.Networking = {
         init: function (scene) {
             sceneRef = scene;
-            console.log('Networking: Initializing...');
+            console.log('Networking: Initializing... (Client v3 with Debug Logs)');
             socket = io();
 
             this.setupUI();
@@ -60,6 +60,15 @@
                 console.log('Room Created:', code);
                 document.getElementById('room-code').innerText = code;
                 document.getElementById('lobby-status').innerText = "Waiting for Player 2...";
+
+                // DIAGNOSTIC CHECK: If clubs don't arrive in 2 seconds, warn user
+                setTimeout(function () {
+                    var hasClubs = Golf.state.clubs && Golf.state.clubs.length > 0;
+                    if (!hasClubs) {
+                        console.error("DIAGNOSTIC: Club data NOT received from server.");
+                        alert("CRITICAL ERROR: Server did not send club data.\n\nIt is highly likely your SERVER is outdated.\n\nPlease STOP and RESTART 'node server.js' to apply the fixes.");
+                    }
+                }, 2000);
             });
 
             socket.on('errorMsg', function (msg) {
@@ -75,7 +84,15 @@
                     scene.matter.body.setPosition(localP.body, { x: data.x, y: data.y });
                     localP.flipX = data.flipX;
 
+                    // Sync Ball Position
+                    if (data.ballX !== undefined && data.ballY !== undefined) {
+                        if (localP.ball) {
+                            scene.matter.body.setPosition(localP.ball, { x: data.ballX, y: data.ballY });
+                        }
+                    }
+
                     // Sync Visibility (Driving)
+                    localP.remoteDriving = data.driving; // Store state for main loop
                     if (data.driving) {
                         localP.sprite.setAlpha(0);
                         localP.ballSprite.setAlpha(0);
@@ -93,8 +110,28 @@
 
             // Initial Clubs
             socket.on('currentClubs', function (clubs) {
-                console.log('Networking: Received Clubs', clubs);
-                Golf.spawnClubs(scene, clubs);
+                console.log('Networking: Received Clubs event from server.');
+                console.log('Networking: Data payload:', JSON.stringify(clubs, null, 2));
+                if (clubs && clubs.length > 0) {
+                    Golf.spawnClubs(scene, clubs);
+                } else {
+                    console.warn('Networking: Received empty clubs array!');
+                }
+            });
+
+            // Cart Update
+            socket.on('cartUpdate', function (data) {
+                // data = { index, x, y, angle }
+                var cart = Golf.state.golfCarts[data.index];
+                if (cart) {
+                    // Sync Physics
+                    scene.matter.body.setPosition(cart.body, { x: data.x, y: data.y });
+                    scene.matter.body.setAngle(cart.body, data.angle);
+
+                    // Sync Visuals immediately (don't wait for main loop)
+                    cart.sprite.setPosition(data.x, data.y);
+                    cart.sprite.setRotation(data.angle);
+                }
             });
 
             // Club Taken
@@ -111,6 +148,22 @@
                         Golf.updateClubUI(myP);
                     }
                 }
+            });
+
+            // Hole Sync
+            socket.on('holeUpdate', function (pos) {
+                console.log('Networking: Hole Update received', pos);
+                // Call spawnHole with explicit position
+                // We need to ensure spawnHole handles this assignment
+                if (Golf.spawnHole) {
+                    Golf.spawnHole(sceneRef, pos.x, pos.y);
+                }
+            });
+
+            socket.on('forceSpawnHole', function () {
+                console.log('Networking: Host requested to spawn new hole');
+                // Initiate a new random hole (Host only receives this)
+                Golf.spawnHole(sceneRef);
             });
         },
 
@@ -137,7 +190,6 @@
                 });
             }
 
-
             if (createBtn) {
                 createBtn.addEventListener('click', function (e) {
                     e.stopPropagation();
@@ -149,7 +201,6 @@
                     }
                 });
             }
-
 
             if (joinBtn) {
                 joinBtn.addEventListener('click', function (e) {
@@ -169,6 +220,8 @@
             var data = {
                 x: p.body.position.x,
                 y: p.body.position.y,
+                ballX: p.ball ? p.ball.position.x : 0,
+                ballY: p.ball ? p.ball.position.y : 0,
                 anim: p.state,
                 driving: p.driving ? true : null // Simplify
             };
@@ -185,11 +238,29 @@
             });
         },
 
+        sendHoleUpdate: function (x, y) {
+            if (!socket) return;
+            socket.emit('holeUpdate', { x: x, y: y });
+        },
+
+        requestNewHole: function () {
+            if (!socket) return;
+            socket.emit('requestNewHole');
+        },
+
         requestPickup: function (clubId) {
             if (!socket) return;
             socket.emit('requestPickup', clubId);
         }
     };
+
+    // Add listeners outside init for cleaner structure, or inside init. 
+    // Ideally inside init. But the 'Networking' object is defined here.
+    // I will append the listeners to the existing init function in a separate edit if needed, 
+    // or just add them here if I could, but `socket` is local to closure.
+    // Wait, I am replacing `requestPickup` and closing brace. 
+    // I need to add listeners inside `init` separately. 
+    // Let's just add the methods here first.
 
     global.Golf = Golf;
 })(typeof window !== 'undefined' ? window : this);

@@ -232,8 +232,12 @@
                 p.sprite.setFlipX(flip);
             }
 
-            // Submerged visual for swimming
-            p.sprite.setAlpha(p.state === Golf.PLAYER_STATES.SWIMMING ? 0.6 : 1.0);
+            // Submerged visual for swimming, or hidden if driving
+            if (p.driving || p.remoteDriving) {
+                p.sprite.setAlpha(0);
+            } else {
+                p.sprite.setAlpha(p.state === Golf.PLAYER_STATES.SWIMMING ? 0.6 : 1.0);
+            }
 
             p.sprite.setPosition(p.body.position.x, p.body.position.y);
 

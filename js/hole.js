@@ -72,7 +72,28 @@
         createHoleArrow(scene);
     };
 
-    Golf.spawnHole = function (scene) {
+    Golf.spawnHole = function (scene, forceX, forceY) {
+        // If coordinates provided (from Server), use them directly
+        if (forceX !== undefined && forceY !== undefined) {
+            state.hole.setPosition(forceX, forceY);
+            if (state.holeSensor) {
+                scene.matter.body.setPosition(state.holeSensor, { x: forceX, y: forceY });
+            }
+            console.log("Hole synced to: " + forceX + ", " + forceY);
+            Golf.updateHoleArrow(scene);
+            return;
+        }
+
+        // Host-Authoritative Logic:
+        // Only Host (myPlayerId === 0) or Singleplayer (myPlayerId === null) generates holes.
+        // Guests do nothing but wait for 'holeUpdate'.
+        var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+
+        if (!isHost) {
+            console.log("Guest: Waiting for hole update from Host...");
+            return;
+        }
+
         var config = Golf.MAP_CONFIG;
         var worldWidth = config.cols * config.tileSize;
         var worldHeight = config.rows * config.tileSize;
@@ -108,6 +129,11 @@
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
         console.log("Hole spawned at: " + hx + ", " + hy + " (dist from spawn: " + dist.toFixed(0) + ")");
+
+        // Broadcast new position if Multiplayer
+        if (Golf.Networking && Golf.Networking.sendHoleUpdate && state.myPlayerId !== null) {
+            Golf.Networking.sendHoleUpdate(hx, hy);
+        }
     };
 
     Golf.updateHoleArrow = function (scene) {
@@ -136,7 +162,16 @@
             alert('ROUND OVER! You finished 10 holes!');
             window.location.reload();
         } else {
-            Golf.spawnHole(scene);
+            // Updated Hole Generation Logic:
+            var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+            if (isHost) {
+                Golf.spawnHole(scene);
+            } else {
+                // Request Host to spawn new hole
+                if (Golf.Networking && Golf.Networking.requestNewHole) {
+                    Golf.Networking.requestNewHole();
+                }
+            }
         }
     };
 })(typeof window !== 'undefined' ? window : this);

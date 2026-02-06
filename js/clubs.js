@@ -25,12 +25,22 @@
             console.log(`[Clubs] Spawning ${data.length} clubs from server data.`);
             // Multiplayer Mode: Spawn from server data
             data.forEach(function (d) {
-                var type = CLUB_TYPES[d.type.name.toUpperCase()];
+                var typeNameUppercase = d.type.name.toUpperCase();
+                console.log(`[Clubs] Processing club ID: ${d.id}, Type: ${d.type.name} (Key: ${typeNameUppercase})`);
+
+                var type = CLUB_TYPES[typeNameUppercase];
                 if (!type) {
-                    // Fallback if type structure is different
+                    console.warn(`[Clubs] Type '${typeNameUppercase}' not found in local definitions. Using server fallback.`);
                     type = d.type;
+                } else {
+                    console.log(`[Clubs] Successfully matched local type:`, type);
                 }
-                createClub(scene, d.x, d.y, type, d.id);
+
+                if (type) {
+                    createClub(scene, d.x, d.y, type, d.id);
+                } else {
+                    console.error(`[Clubs] Failed to resolve type for club ${d.id}`);
+                }
             });
         } else {
             console.log('[Clubs] Generating 120 random clubs (single-player mode).');
