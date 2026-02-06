@@ -22,17 +22,20 @@
         var clubList = [];
 
         if (data) {
-            console.log(`[Clubs] Spawning ${data.length} clubs from Host Data.`);
-            // Client Mode: Spawn from data
+            console.log(`[Clubs] Spawning ${data.length} clubs from server data.`);
+            // Multiplayer Mode: Spawn from server data
             data.forEach(function (d) {
-                var type = CLUB_TYPES[d.typeIndex];
-                // Note: using typeIndex (string key) to lookup type object
-                createClub(scene, d.x, d.y, type);
+                var type = CLUB_TYPES[d.type.name.toUpperCase()];
+                if (!type) {
+                    // Fallback if type structure is different
+                    type = d.type;
+                }
+                createClub(scene, d.x, d.y, type, d.id);
             });
-        } else if (state.isHost) {
-            console.log('[Clubs] Generating 120 random clubs (Host Mode).');
+        } else {
+            console.log('[Clubs] Generating 120 random clubs (single-player mode).');
 
-            // Host Mode: Generate Random
+            // Single-player Mode: Generate Random
             var types = Object.keys(CLUB_TYPES);
             for (var i = 0; i < 120; i++) {
                 var typeKey = types[Phaser.Math.Between(0, types.length - 1)];
@@ -48,14 +51,12 @@
                     typeIndex: typeKey
                 });
             }
-        } else {
-            console.log('[Clubs] Guest waiting for host data. No clubs spawned.');
         }
 
         return clubList;
     };
 
-    function createClub(scene, x, y, type) {
+    function createClub(scene, x, y, type, id) {
         var sprite = scene.add.rectangle(x, y, 34, 34, type.color).setStrokeStyle(2, 0xffffff);
         var txt = scene.add.text(x, y, type.name.charAt(0), {
             family: 'Outfit',
@@ -63,7 +64,10 @@
             fontStyle: 'bold',
             color: '#000'
         }).setOrigin(0.5);
-        state.clubs.push({ sprite: sprite, txt: txt, type: type, x: x, y: y });
+
+        // Store ID for networking
+        state.clubs.push({ id: id, sprite: sprite, txt: txt, type: type, x: x, y: y });
+
         scene.tweens.add({
             targets: [sprite, txt],
             y: y - 10,
@@ -72,6 +76,19 @@
             repeat: -1
         });
     }
+
+    Golf.removeClub = function (id) {
+        var index = state.clubs.findIndex(function (c) { return c.id === id; });
+        if (index !== -1) {
+            var c = state.clubs[index];
+            if (c.sprite) c.sprite.destroy();
+            if (c.txt) c.txt.destroy();
+            state.clubs.splice(index, 1);
+            console.log('[Clubs] Club removed:', id);
+            return c.type; // Return type so we can add to inventory if needed
+        }
+        return null;
+    };
 
     Golf.updateClubUI = function (p) {
         console.log(`[UI] Updating Club UI for Player ${p.playerIndex}. Items: ${p.inventory.length}`);

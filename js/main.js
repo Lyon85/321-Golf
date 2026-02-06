@@ -82,13 +82,14 @@
             blendMode: 'ADD'
         });
 
-        if (state.isHost) {
-            // state.generatedClubs = Golf.spawnClubs(scene);
-            // NOW DEFERRED: Clubs spawn on connection (networking.js) or start trigger (countdown.js)
-            console.log('[Main] Host waiting for Connection or Start to spawn clubs.');
-        } else {
-            console.log('[Main] Guest waiting for CLUBS_INIT');
+        // Clubs will be spawned by server and sent via game-start event
+        console.log('[Main] Waiting for server to send club positions...');
+
+        // Initialize Networking
+        if (Golf.Networking) {
+            Golf.Networking.init(scene);
         }
+
 
 
         Golf.createHole(scene);
@@ -104,11 +105,12 @@
             Golf.createPlayer(scene, spawnX, spawnY, 0xff4757, false, 0)
         );
         state.players.push(
-            Golf.createPlayer(scene, spawnX + 100, spawnY, 0x1e90ff, true, 1)
+            Golf.createPlayer(scene, spawnX + 100, spawnY, 0x1e90ff, false, 1)
         );
         state.players.push(
-            Golf.createPlayer(scene, spawnX - 100, spawnY, 0xfeca57, true, 2)
+            Golf.createPlayer(scene, spawnX - 100, spawnY, 0xfeca57, false, 2)
         );
+
 
         scene.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,E,SHIFT,ONE,TWO');
 
@@ -120,7 +122,8 @@
             }).setOrigin(0.5).setDepth(200);
         });
 
-        scene.cameras.main.startFollow(state.players[0].sprite, true, 0.1, 0.1);
+        // Camera will be set to follow the correct player after game starts
+        // Either by networking.js (multiplayer) or by triggerStart (single-player)
 
         state.players.forEach(function (p) {
             Golf.createGolfCart(scene, p.body.position.x + 60, p.body.position.y, p.color, p.playerIndex);
@@ -158,31 +161,40 @@
         if (state.isWaitingToStart) return;
         if (scene.sinkCooldownFrames > 0) scene.sinkCooldownFrames--;
 
-        Golf.updateHoleArrow(scene);
+        // Ensure camera is following the correct player
+        // Force it for the first 60 frames to make sure it sticks
+        if (!scene.cameraFollowFrames) scene.cameraFollowFrames = 0;
 
-        if (state.isHost) {
-            Golf.broadcastState(scene);
-        } else {
-            Golf.sendGuestInput(scene);
+        var localPlayerIndex = state.myPlayerId !== null ? state.myPlayerId : 0;
+        if (state.players[localPlayerIndex]) {
+            if (scene.cameraFollowFrames < 60) {
+                scene.cameras.main.startFollow(state.players[localPlayerIndex].sprite, true, 0.1, 0.1);
+                scene.cameraFollowFrames++;
+                if (scene.cameraFollowFrames === 1) {
+                    console.log('[Update] Camera forcefully following player', localPlayerIndex);
+                }
+            }
         }
 
+        Golf.updateHoleArrow(scene);
+
+        // Send player input to server every frame
+        // Golf.sendPlayerInput(scene); // Removing old placeholder
+
+        var localPlayerIndex = state.myPlayerId !== null ? state.myPlayerId : 0;
+        if (state.players[localPlayerIndex] && Golf.Networking) {
+            Golf.Networking.sendPlayerInput(state.players[localPlayerIndex]);
+        }
+
+
         state.players.forEach(function (p, index) {
-            // Only the Host calculates physics/logic for AI and remote players
-            if (state.isHost) {
-                if (p.isAI) {
-                    Golf.handleAIBehavior(scene, p);
-                } else if (index === 0) {
-                    // Local player 1
-                    handleHumanInput(scene, p);
-                } else if (index === 1 && state.connection) {
-                    // Remote player 2 (the guest) handled on host via their inputs
-                    handleRemotePlayerInput(scene, p);
-                }
-            } else {
-                // If guest, only handle local player (index 1) input to send to host
-                if (index === 1) {
-                    handleHumanInput(scene, p);
-                }
+            // Handle local player input
+            // In single-player: control player 0
+            // In multiplayer: control the player assigned by server (myPlayerId)
+            var isLocalPlayer = (state.myPlayerId === null && index === 0) || (index === state.myPlayerId);
+
+            if (isLocalPlayer && !p.isAI) {
+                handleHumanInput(scene, p);
             }
 
             // Update animations based on state
@@ -283,19 +295,17 @@
                 state.clubs.forEach(function (c, i) {
                     if (
                         c.sprite.visible &&
+                        !c.tempTaken && // Avoid spamming
                         Phaser.Math.Distance.Between(
                             p.body.position.x, p.body.position.y,
                             c.x, c.y
                         ) < 60
                     ) {
-                        p.inventory.push(c.type);
-                        if (!p.activeClub) p.activeClub = c.type;
-                        c.sprite.visible = false;
-                        c.txt.visible = false;
-                        if (!p.isAI) Golf.updateClubUI(p);
-
-                        // Sync: Tell everyone this club is gone
-                        if (state.isHost) Golf.broadcastPickup(i);
+                        // Request pickup from server
+                        if (Golf.Networking && c.id !== undefined) {
+                            Golf.Networking.requestPickup(c.id);
+                            c.tempTaken = true; // Local Debounce
+                        }
                     }
                 });
             }
@@ -310,7 +320,7 @@
                 }
             }
 
-            if (!p.isAI) {
+            if (isLocalPlayer && !p.isAI) {
                 var nearCart = null;
                 state.golfCarts.forEach(function (cart) {
                     var dist = Phaser.Math.Distance.Between(
@@ -341,6 +351,7 @@
                 }
             }
 
+
             if (p.driving) {
                 p.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y);
                 scene.matter.body.setPosition(p.body, p.driving.body.position);
@@ -348,11 +359,21 @@
                 p.driving.sprite.setRotation(p.driving.body.angle);
             }
 
-            state.golfCarts.forEach(function (cart) {
-                cart.sprite.setPosition(cart.body.position.x, cart.body.position.y);
-                cart.sprite.setRotation(cart.body.angle);
-            });
         });
+
+        // Update Carts (Moved outside player loop)
+        state.golfCarts.forEach(function (cart, index) {
+            cart.sprite.setPosition(cart.body.position.x, cart.body.position.y);
+            cart.sprite.setRotation(cart.body.angle);
+
+            // If local player is driving this cart, send update
+            var localP = state.players[localPlayerIndex];
+            if (localP && localP.driving === cart && Golf.Networking) {
+                Golf.Networking.sendCartUpdate(index, cart);
+            }
+        });
+
+
     }
 
     function handleHumanInput(scene, p) {

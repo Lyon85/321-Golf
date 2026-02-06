@@ -112,7 +112,17 @@
             }).setOrigin(0.5).setDepth(200);
         });
 
-        scene.cameras.main.startFollow(state.players[0].sprite, true, 0.1, 0.1);
+        //scene.cameras.main.startFollow(state.players[0].sprite, true, 0.1, 0.1);
+
+        var localIndex = state.isHost ? 0 : 1;
+
+        scene.cameras.main.startFollow(
+            state.players[localIndex].sprite,
+            true,
+            0.1,
+            0.1
+        );
+
 
         state.players.forEach(function (p) {
             Golf.createGolfCart(scene, p.body.position.x + 60, p.body.position.y);

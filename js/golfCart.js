@@ -43,7 +43,7 @@
 
         p.driving = cart;
         p.sprite.setVisible(false); // Hide sprite to prevent jitter/ghosting
-        p.sprite.setAlpha(0.7);
+        p.sprite.setAlpha(0);
         p.savedMask = p.body.collisionFilter.mask;
         p.body.collisionFilter.mask = 0;
         p.body.isSensor = true;

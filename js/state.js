@@ -17,9 +17,8 @@
         hitConeGraphics: null,
         particles: null,
         terrains: [],
-        isHost: true,
-        connection: null,
-        remotePlayers: {},
-        myId: null
+        myPlayerId: null, // Server-assigned player ID (0 or 1)
+        lastProcessedInput: 0,
+        pendingInputs: []
     };
 })(typeof window !== 'undefined' ? window : this);
