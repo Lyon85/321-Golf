@@ -108,46 +108,36 @@
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
 
-        // Initial spawn fallback (overridden by Golf.loadMap)
-        var spawnX = worldWidth / 2;
-        var spawnY = worldHeight / 2;
+        // Select Spawn Point from available Tees
+        if (state.teePositions && state.teePositions.length > 0) {
+            // Default to first tee if not set by network
+            if (!state.selectedTee) {
+                var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+                if (isHost) {
+                    var randomIndex = Phaser.Math.Between(0, state.teePositions.length - 1);
+                    state.selectedTee = state.teePositions[randomIndex];
+                    console.log("[Main] Host selected random tee:", state.selectedTee);
+
+                    // Broadcast if in multiplayer
+                    if (state.myPlayerId !== null && Golf.Networking && Golf.Networking.sendSpawnUpdate) {
+                        Golf.Networking.sendSpawnUpdate(state.selectedTee);
+                    }
+                }
+            }
+        }
+
+        var spawnX = state.selectedTee ? state.selectedTee.x : (state.spawnPoint ? state.spawnPoint.x : worldWidth / 2);
+        var spawnY = state.selectedTee ? state.selectedTee.y : (state.spawnPoint ? state.spawnPoint.y : worldHeight / 2);
 
         state.players.push(
             Golf.createPlayer(scene, spawnX, spawnY, 0xff4757, false, 0)
         );
         state.players.push(
-            Golf.createPlayer(scene, spawnX + 100, spawnY, 0x1e90ff, false, 1)
+            Golf.createPlayer(scene, spawnX, spawnY, 0x1e90ff, false, 1)
         );
         state.players.push(
-            Golf.createPlayer(scene, spawnX - 100, spawnY, 0xfeca57, false, 2)
+            Golf.createPlayer(scene, spawnX, spawnY, 0xfeca57, false, 2)
         );
-
-        Golf.setSpawnPoint = function (pos) {
-            state.selectedSpawn = pos;
-            state.players.forEach(function (p, i) {
-                var offsetX = (i === 1) ? 100 : (i === 2 ? -100 : 0);
-                scene.matter.body.setPosition(p.body, { x: pos.x + offsetX, y: pos.y });
-                if (p.ball) scene.matter.body.setPosition(p.ball, { x: pos.x + offsetX + 60, y: pos.y });
-                p.lastSafePos = { x: pos.x + offsetX + 60, y: pos.y };
-            });
-            console.log("[Main] Spawn point synchronized:", pos);
-        };
-
-        // Determine initial spawn
-        if (state.spawnPositions && state.spawnPositions.length > 0) {
-            var isHost = (state.myPlayerId === 0);
-            var isSinglePlayer = (state.myPlayerId === null);
-
-            if (isHost || isSinglePlayer) {
-                var randomIndex = Phaser.Math.Between(0, state.spawnPositions.length - 1);
-                var pickedSpawn = state.spawnPositions[randomIndex];
-                Golf.setSpawnPoint(pickedSpawn);
-
-                if (isHost && Golf.Networking && Golf.Networking.sendSpawnUpdate) {
-                    Golf.Networking.sendSpawnUpdate(pickedSpawn);
-                }
-            }
-        }
 
 
         scene.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,E,SHIFT,ONE,TWO');
@@ -205,11 +195,12 @@
 
         var localPlayerIndex = state.myPlayerId !== null ? state.myPlayerId : 0;
         if (state.players[localPlayerIndex]) {
-            // Keep the camera locked to THE CURRENT local player
-            // If myPlayerId changes from null to 1, this will jump to P1
-            if (scene.cameras.main._follow !== state.players[localPlayerIndex].sprite) {
+            if (scene.cameraFollowFrames < 60) {
                 scene.cameras.main.startFollow(state.players[localPlayerIndex].sprite, true, 0.1, 0.1);
-                console.log('[Update] Camera focus shifted to player', localPlayerIndex);
+                scene.cameraFollowFrames++;
+                if (scene.cameraFollowFrames === 1) {
+                    console.log('[Update] Camera forcefully following player', localPlayerIndex);
+                }
             }
         }
 

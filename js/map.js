@@ -10,7 +10,7 @@
     Golf.MAP_DATA = [];
 
     // Load map from external file
-    Golf.fetchMap = function (url) {
+    Golf.loadMap = function (url) {
         return fetch(url)
             .then(response => {
                 if (!response.ok) throw new Error("Failed to load map file: " + response.statusText);
@@ -19,11 +19,11 @@
             .then(text => {
                 const lines = text.trim().split("\n");
 
-                Golf.MAP_DATA = lines;
+                // Join into one string so replace works
+                Golf.MAP_DATA = lines.join(",");  // <-- key change
 
                 Golf.MAP_CONFIG.rows = lines.length;
-                // Correctly count columns by ignoring commas inside brackets
-                Golf.MAP_CONFIG.cols = lines[0].split(/,(?![^\[]*\])/).length;
+                Golf.MAP_CONFIG.cols = lines[0].split(",").length;
 
                 return Golf.MAP_DATA;
             })
@@ -32,7 +32,7 @@
 
 
     // Now call it
-    Golf.fetchMap("maps/map.txt").then(() => {
+    Golf.loadMap("maps/map.txt").then(() => {
         console.log("Map loaded:", Golf.MAP_DATA);
         console.log("Map config:", Golf.MAP_CONFIG);
     });

@@ -20,6 +20,12 @@
             socket.on('assignPlayer', function (index) {
                 console.log('Networking: Assigned Player Index:', index);
                 Golf.state.myPlayerId = index;
+
+                // FORCE Camera Update immediately
+                if (Golf.state.players[index]) {
+                    scene.cameras.main.startFollow(Golf.state.players[index].sprite, true, 0.1, 0.1);
+                    console.log('Networking: Camera attached to P' + index);
+                }
             });
 
             // Initial Load of existing players
@@ -155,20 +161,24 @@
                 }
             });
 
+            // Spawn Point Sync
+            socket.on('spawnUpdate', function (pos) {
+                console.log('Networking: Spawn Update received', pos);
+                Golf.state.selectedTee = pos;
+                // If players already exist, we might need to reposition them? 
+                // However, they are created during Golf.create which usually waits for gameStart.
+                // Let's reposition just in case.
+                Golf.state.players.forEach(function (p) {
+                    if (p.body) {
+                        sceneRef.matter.body.setPosition(p.body, { x: pos.x, y: pos.y });
+                    }
+                });
+            });
+
             socket.on('forceSpawnHole', function () {
                 console.log('Networking: Host requested to spawn new hole');
                 // Initiate a new random hole (Host only receives this)
                 Golf.spawnHole(sceneRef);
-            });
-
-            // Spawn Sync
-            socket.on('spawnUpdate', function (pos) {
-                console.log('Networking: Spawn Update received', pos);
-                if (Golf.setSpawnPoint) {
-                    Golf.setSpawnPoint(pos);
-                } else {
-                    Golf.state.selectedSpawn = pos;
-                }
             });
         },
 
@@ -248,6 +258,11 @@
             socket.emit('holeUpdate', { x: x, y: y });
         },
 
+        sendSpawnUpdate: function (pos) {
+            if (!socket) return;
+            socket.emit('spawnUpdate', pos);
+        },
+
         requestNewHole: function () {
             if (!socket) return;
             socket.emit('requestNewHole');
@@ -256,11 +271,6 @@
         requestPickup: function (clubId) {
             if (!socket) return;
             socket.emit('requestPickup', clubId);
-        },
-
-        sendSpawnUpdate: function (pos) {
-            if (!socket) return;
-            socket.emit('spawnUpdate', pos);
         }
     };
 

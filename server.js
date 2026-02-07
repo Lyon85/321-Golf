@@ -175,11 +175,6 @@ io.on('connection', (socket) => {
                 socket.emit('holeUpdate', room.holePosition);
             }
 
-            // Sync Spawn if exists
-            if (room.spawnPosition) {
-                socket.emit('spawnUpdate', room.spawnPosition);
-            }
-
         } else {
             socket.emit('errorMsg', 'Room not found');
         }
@@ -244,7 +239,7 @@ io.on('connection', (socket) => {
         const code = Array.from(socket.rooms).find(r => r !== socket.id);
         if (code && rooms[code]) {
             rooms[code].spawnPosition = pos; // Persist for new joiners
-            socket.to(code).emit('spawnUpdate', pos); // Broadcast to others
+            socket.to(code).emit('spawnUpdate', pos);
         }
     });
 

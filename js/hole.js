@@ -100,20 +100,8 @@
             return;
         }
 
-        // --- Shuffle Bag Logic for Progressive Rotation ---
-        if (!state.availableHoles || state.availableHoles.length === 0) {
-            console.log("Refilling hole shuffle bag...");
-            // Fill with indices 0 to N-1
-            state.availableHoles = state.holePositions.map((_, i) => i);
-            // Shuffle
-            for (let i = state.availableHoles.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [state.availableHoles[i], state.availableHoles[j]] = [state.availableHoles[j], state.availableHoles[i]];
-            }
-        }
-
-        // Pop the next hole index
-        var randomIndex = state.availableHoles.pop();
+        // Select a random hole position
+        var randomIndex = Phaser.Math.Between(0, state.holePositions.length - 1);
         var holePos = state.holePositions[randomIndex];
 
         var hx = holePos.x;
@@ -123,7 +111,7 @@
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
-        console.log("Hole spawned at position " + (randomIndex + 1) + " (Remaining in bag: " + state.availableHoles.length + "): " + hx + ", " + hy);
+        console.log("Hole spawned at predetermined position " + (randomIndex + 1) + ": " + hx + ", " + hy);
 
         // Update UI if available
         if (scene.holeDisplay) {
