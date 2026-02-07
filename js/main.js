@@ -108,22 +108,17 @@
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
 
-        // Initialize at the first tee by default
-        if (state.teePositions && state.teePositions.length > 0 && !state.selectedTee) {
-            state.selectedTee = state.teePositions[0];
-        }
-
-        var spawnX = state.selectedTee ? state.selectedTee.x : worldWidth / 2;
-        var spawnY = state.selectedTee ? state.selectedTee.y : worldHeight / 2;
+        var spawnX = state.spawnPoint ? state.spawnPoint.x : worldWidth / 2;
+        var spawnY = state.spawnPoint ? state.spawnPoint.y : worldHeight / 2;
 
         state.players.push(
             Golf.createPlayer(scene, spawnX, spawnY, 0xff4757, false, 0)
         );
         state.players.push(
-            Golf.createPlayer(scene, spawnX, spawnY, 0x1e90ff, false, 1)
+            Golf.createPlayer(scene, spawnX + 100, spawnY, 0x1e90ff, false, 1)
         );
         state.players.push(
-            Golf.createPlayer(scene, spawnX, spawnY, 0xfeca57, false, 2)
+            Golf.createPlayer(scene, spawnX - 100, spawnY, 0xfeca57, false, 2)
         );
 
 

@@ -73,18 +73,25 @@ function generateRoomCode() {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    socket.on('createRoom', (data) => {
+    socket.on('createRoom', () => {
         try {
             const code = generateRoomCode();
             console.log(`[Server] Creating room ${code} for host ${socket.id}`);
 
             const clubs = generateFixedClubs(5000, 1500);
+            console.log(`[Server] Clubs generated: ${clubs ? clubs.length : 'NULL'}`);
+            // Verify serializability
+            try {
+                JSON.stringify(clubs);
+            } catch (jsonErr) {
+                console.error('[Server] Club data is not serializable!', jsonErr);
+            }
 
             rooms[code] = {
                 players: {},
                 carts: [],
+                // Map Config matched to client (20 cols * 250 tile = 5000, 6 rows * 250 = 1500)
                 clubs: clubs,
-                spawnPosition: data ? data.spawnPosition : null,
                 started: false
             };
             socket.join(code);
@@ -168,11 +175,6 @@ io.on('connection', (socket) => {
                 socket.emit('holeUpdate', room.holePosition);
             }
 
-            // Sync Spawn if exists
-            if (room.spawnPosition) {
-                socket.emit('spawnUpdate', room.spawnPosition);
-            }
-
         } else {
             socket.emit('errorMsg', 'Room not found');
         }
@@ -230,14 +232,6 @@ io.on('connection', (socket) => {
         if (code && rooms[code]) {
             rooms[code].holePosition = pos; // Persist for new joiners
             socket.to(code).emit('holeUpdate', pos); // Broadcast to others
-        }
-    });
-
-    socket.on('spawnUpdate', (pos) => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
-        if (code && rooms[code]) {
-            rooms[code].spawnPosition = pos; // Persist for new joiners
-            socket.to(code).emit('spawnUpdate', pos);
         }
     });
 

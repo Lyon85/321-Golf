@@ -161,26 +161,6 @@
                 }
             });
 
-            // Spawn Point Sync
-            socket.on('spawnUpdate', function (pos) {
-                console.log('Networking: Spawn Update received', pos);
-                Golf.state.selectedTee = pos;
-                // If players already exist, we might need to reposition them? 
-                // However, they are created during Golf.create which usually waits for gameStart.
-                // Let's reposition just in case.
-                Golf.state.players.forEach(function (p) {
-                    if (p.body) {
-                        sceneRef.matter.body.setPosition(p.body, { x: pos.x, y: pos.y });
-                    }
-                    if (p.ball) {
-                        sceneRef.matter.body.setPosition(p.ball, { x: pos.x, y: pos.y });
-                    }
-                    if (p.sprite) {
-                        p.sprite.setPosition(pos.x, pos.y);
-                    }
-                });
-            });
-
             socket.on('forceSpawnHole', function () {
                 console.log('Networking: Host requested to spawn new hole');
                 // Initiate a new random hole (Host only receives this)
@@ -216,21 +196,7 @@
                     e.stopPropagation();
                     console.log('Networking: Create Room Clicked');
                     if (socket) {
-                        var spawnPos = null;
-                        if (Golf.state.teePositions && Golf.state.teePositions.length > 0) {
-                            var rnd = Math.floor(Math.random() * Golf.state.teePositions.length);
-                            spawnPos = Golf.state.teePositions[rnd];
-                            Golf.state.selectedTee = spawnPos;
-                            console.log('Networking: Host selected spawn for room:', spawnPos);
-
-                            // Reposition local players immediately
-                            Golf.state.players.forEach(function (p) {
-                                if (p.body) sceneRef.matter.body.setPosition(p.body, { x: spawnPos.x, y: spawnPos.y });
-                                if (p.ball) sceneRef.matter.body.setPosition(p.ball, { x: spawnPos.x, y: spawnPos.y });
-                                if (p.sprite) p.sprite.setPosition(spawnPos.x, spawnPos.y);
-                            });
-                        }
-                        socket.emit('createRoom', { spawnPosition: spawnPos });
+                        socket.emit('createRoom');
                     } else {
                         console.error('Networking: Socket not initialized');
                     }
@@ -276,11 +242,6 @@
         sendHoleUpdate: function (x, y) {
             if (!socket) return;
             socket.emit('holeUpdate', { x: x, y: y });
-        },
-
-        sendSpawnUpdate: function (pos) {
-            if (!socket) return;
-            socket.emit('spawnUpdate', pos);
         },
 
         requestNewHole: function () {

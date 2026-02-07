@@ -14,7 +14,7 @@
         var tokens = Golf.MAP_DATA.replace(/\s+/g, '').split(',');
 
         state.mapGrid = [];
-        state.teePositions = [];
+        state.spawnPoint = { x: config.tileSize / 2, y: config.tileSize / 2 };
 
         // worldGroup is still used to hold dynamic elements if needed, 
         // but pool objects will be added to it during init.
@@ -45,8 +45,9 @@
                     tileInfo.type = 'rough';
                 } else if (token === 'b') {
                     tileInfo.type = 'sand';
-                } else if (token === 'm1' || token === 'm2') {
-                    tileInfo.type = token;
+                } else if (token === 's' || token === 't') {
+                    tileInfo.type = token === 's' ? 'spawn' : 'tee';
+                    state.spawnPoint = { x: x, y: y };
                 } else if (token === 'h') {
                     tileInfo.type = 'hole_position';
                     if (!state.holePositions) state.holePositions = [];
@@ -57,12 +58,6 @@
                 }
 
                 state.mapGrid[r][c] = tileInfo;
-
-                // Check for Tee marker [t]
-                if (token === 't' || token.includes('[t]')) {
-                    tileInfo.hasTee = true;
-                    state.teePositions.push({ x: x, y: y });
-                }
             }
         }
     };
@@ -168,10 +163,6 @@
                     color = 0x27ae60;
                 } else if (token === 'b') {
                     color = 0xf1c40f;
-                } else if (token === 'm1') {
-                    color = 0x95a5a6;
-                } else if (token === 'm2') {
-                    color = 0x7f8c8d;
                 } else if (token.startsWith('i')) {
                     color = 0x8bc34a;
                 }
@@ -183,7 +174,7 @@
                     poolObj.arrow.setPosition(x, y).setAngle(tile.angle).setVisible(true);
                 }
 
-                if (tile.hasTee) {
+                if (tile.type === 'tee') {
                     poolObj.tee.marker.setPosition(x, y).setVisible(true);
                     poolObj.tee.inner.setPosition(x, y).setVisible(true);
                     poolObj.tee.text.setPosition(x, y).setVisible(true);
