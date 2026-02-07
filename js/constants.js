@@ -51,6 +51,8 @@
         GRASS: { name: 'Grass', color: 0x2ecc71, frictionAir: 0.015, label: 'grass' },
         ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 0.05, label: 'rough' },
         SAND: { name: 'Sand', color: 0xf1c40f, frictionAir: 0.2, label: 'sand' },
-        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 }
+        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 },
+        M1: { name: 'Rock 1', color: 0x95a5a6, frictionAir: 0.1, label: 'rock1' },
+        M2: { name: 'Rock 2', color: 0x7f8c8d, frictionAir: 0.1, label: 'rock2' }
     };
 })(typeof window !== 'undefined' ? window : this);
