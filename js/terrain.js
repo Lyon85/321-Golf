@@ -7,7 +7,7 @@
     var TERRAIN_TYPES = Golf.TERRAIN_TYPES;
 
     /**
-     * Parses the manual map data and creates visuals/sensors.
+     * Parses the manual map data and creates sensors.
      */
     Golf.loadMap = function (scene) {
         var config = Golf.MAP_CONFIG;
@@ -15,7 +15,12 @@
 
         state.mapGrid = [];
         state.spawnPoint = { x: config.tileSize / 2, y: config.tileSize / 2 };
-        var worldGroup = scene.add.container(0, 0).setDepth(-11);
+
+        // worldGroup is still used to hold dynamic elements if needed, 
+        // but pool objects will be added to it during init.
+        if (!state.worldGroup) {
+            state.worldGroup = scene.add.container(0, 0).setDepth(-11);
+        }
 
         for (var r = 0; r < config.rows; r++) {
             state.mapGrid[r] = [];
@@ -24,115 +29,158 @@
                 var x = c * config.tileSize + config.tileSize / 2;
                 var y = r * config.tileSize + config.tileSize / 2;
 
-                var tileInfo = { type: 'grass', angle: null, depth: null };
-                var color = 0x2ecc71; // Default Grass
+                var tileInfo = { type: 'grass', angle: null, depth: null, token: token };
 
                 // Water with depth variations
                 if (token.startsWith('w')) {
                     tileInfo.type = 'water';
-                    if (token === 'w1') {
-                        tileInfo.depth = 1; // Shallow
-                        color = 0x5dade2; // Light blue
-                    } else if (token === 'w2') {
-                        tileInfo.depth = 2; // Medium
-                        color = 0x3498db; // Medium blue
-                    } else if (token === 'w3') {
-                        tileInfo.depth = 3; // Deep
-                        color = 0x2874a6; // Dark blue
-                    } else {
-                        tileInfo.depth = 2; // Default to medium
-                        color = 0x3498db;
-                    }
-                    // Add water sensor
+                    // Water sensor (keep these permanent as they are light and needed for physics)
                     scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
                         isStatic: true, isSensor: true, label: 'water',
                         collisionFilter: { category: CAT_TERRAIN }
                     });
-                    // Grass variations
                 } else if (token.startsWith('g')) {
                     tileInfo.type = 'grass';
-                    if (token === 'g1') {
-                        color = 0x2ecc71; // Standard grass
-                    } else if (token === 'g2') {
-                        color = 0x27ae60; // Slightly darker grass
-                    } else {
-                        color = 0x2ecc71; // Default
-                    }
                 } else if (token === 'r') {
                     tileInfo.type = 'rough';
-                    color = 0x27ae60;
                 } else if (token === 'b') {
                     tileInfo.type = 'sand';
-                    color = 0xf1c40f;
-                } else if (token === 's') {
-                    tileInfo.type = 'spawn';
-                    color = 0x2ecc71; // Keep grass color
+                } else if (token === 's' || token === 't') {
+                    tileInfo.type = token === 's' ? 'spawn' : 'tee';
                     state.spawnPoint = { x: x, y: y };
-                    console.log("Spawn point set at: " + x + ", " + y);
-                    // Tee-off position (player spawn)
-                } else if (token === 't') {
-                    tileInfo.type = 'tee';
-                    color = 0x2ecc71; // Grass color
-                    // Tee is the actual spawn point
-                    state.spawnPoint = { x: x, y: y };
-                    console.log("Tee/Spawn point set at: " + x + ", " + y);
-                    // Hole position (predetermined locations for holes to appear)
                 } else if (token === 'h') {
                     tileInfo.type = 'hole_position';
-                    color = 0x2ecc71; // Grass color (no visual marker yet)
-                    // Store hole position for random spawning
                     if (!state.holePositions) state.holePositions = [];
                     state.holePositions.push({ x: x, y: y, row: r, col: c });
                 } else if (token.startsWith('i')) {
                     tileInfo.type = 'incline';
                     tileInfo.angle = parseInt(token.substring(1));
-                    color = 0x8bc34a; // Lighter green for hills
                 }
-
-                var rect = scene.add.rectangle(x, y, config.tileSize, config.tileSize, color)
-                    .setStrokeStyle(2, 0x000000, 0.3) // Thinner outline
-                    .setDepth(-11);
-                worldGroup.add(rect);
-
-                // Add tile label
-                var label = scene.add.text(x, y, token, {
-                    family: 'monospace',
-                    fontSize: '12px',
-                    color: '#000000',
-                    align: 'center'
-                }).setOrigin(0.5, 1.5).setAlpha(0.6).setDepth(-10); // Offset label upwards
-                worldGroup.add(label);
-
-                // Add directional arrow for inclines
-                if (tileInfo.type === 'incline' && tileInfo.angle !== null) {
-                    var arrow = scene.add.text(x, y, '→', {
-                        family: 'monospace',
-                        fontSize: '24px',
-                        color: '#000000',
-                        fontStyle: '900'
-                    }).setOrigin(0.5).setAngle(tileInfo.angle).setAlpha(0.7).setDepth(-10);
-                    worldGroup.add(arrow);
-                }
-
-                // Add tee marker
-                if (tileInfo.type === 'tee') {
-                    var teeMarker = scene.add.circle(x, y, 12, 0xff0000).setDepth(-9);
-                    worldGroup.add(teeMarker);
-                    var teeInner = scene.add.circle(x, y, 8, 0xff6b6b).setDepth(-8);
-                    worldGroup.add(teeInner);
-                    var teeText = scene.add.text(x, y, 'TEE', {
-                        family: 'monospace',
-                        fontSize: '12px',
-                        color: '#ffffff',
-                        fontStyle: 'bold'
-                    }).setOrigin(0.5).setDepth(-7);
-                    worldGroup.add(teeText);
-                }
-
-                // Don't render hole markers yet - they'll be spawned dynamically
-                // Hole positions are stored in state.holePositions for random selection
 
                 state.mapGrid[r][c] = tileInfo;
+            }
+        }
+    };
+
+    /**
+     * Initializes a pool of tile objects to be reused for rendering the viewport.
+     */
+    Golf.initTilePool = function (scene) {
+        var config = Golf.MAP_CONFIG;
+        // Calculate max tiles visible on screen plus a buffer
+        var maxTilesX = Math.ceil(scene.cameras.main.width / config.tileSize) + 2;
+        var maxTilesY = Math.ceil(scene.cameras.main.height / config.tileSize) + 2;
+        var poolSize = maxTilesX * maxTilesY;
+
+        state.tilePool = [];
+        for (var i = 0; i < poolSize; i++) {
+            var rect = scene.add.rectangle(0, 0, config.tileSize, config.tileSize, 0xffffff)
+                .setStrokeStyle(2, 0x000000, 0.3)
+                .setDepth(-11)
+                .setVisible(false);
+
+            var label = scene.add.text(0, 0, '', {
+                family: 'monospace',
+                fontSize: '12px',
+                color: '#000000',
+                align: 'center'
+            }).setOrigin(0.5, 1.5).setAlpha(0.6).setDepth(-10).setVisible(false);
+
+            var arrow = scene.add.text(0, 0, '→', {
+                family: 'monospace',
+                fontSize: '24px',
+                color: '#000000',
+                fontStyle: '900'
+            }).setOrigin(0.5).setAlpha(0.7).setDepth(-10).setVisible(false);
+
+            var teeMarker = scene.add.circle(0, 0, 12, 0xff0000).setDepth(-9).setVisible(false);
+            var teeInner = scene.add.circle(0, 0, 8, 0xff6b6b).setDepth(-8).setVisible(false);
+            var teeText = scene.add.text(0, 0, 'TEE', {
+                family: 'monospace',
+                fontSize: '12px',
+                color: '#ffffff',
+                fontStyle: 'bold'
+            }).setOrigin(0.5).setDepth(-7).setVisible(false);
+
+            state.tilePool.push({
+                rect: rect,
+                label: label,
+                arrow: arrow,
+                tee: { marker: teeMarker, inner: teeInner, text: teeText }
+            });
+
+            state.worldGroup.add([rect, label, arrow, teeMarker, teeInner, teeText]);
+        }
+        state.poolIdx = 0;
+    };
+
+    /**
+     * Updates which tiles are visible based on the camera viewport.
+     */
+    Golf.updateMapVisibility = function (scene) {
+        if (!state.mapGrid || !state.tilePool) return;
+
+        var cam = scene.cameras.main;
+        var config = Golf.MAP_CONFIG;
+
+        var startCol = Math.max(0, Math.floor(cam.scrollX / config.tileSize));
+        var endCol = Math.min(config.cols - 1, Math.ceil((cam.scrollX + cam.width) / config.tileSize));
+        var startRow = Math.max(0, Math.floor(cam.scrollY / config.tileSize));
+        var endRow = Math.min(config.rows - 1, Math.ceil((cam.scrollY + cam.height) / config.tileSize));
+
+        // Hide all pooled objects first
+        state.tilePool.forEach(function (p) {
+            p.rect.setVisible(false);
+            p.label.setVisible(false);
+            p.arrow.setVisible(false);
+            p.tee.marker.setVisible(false);
+            p.tee.inner.setVisible(false);
+            p.tee.text.setVisible(false);
+        });
+
+        var poolIdx = 0;
+        for (var r = startRow; r <= endRow; r++) {
+            for (var c = startCol; c <= endCol; c++) {
+                if (poolIdx >= state.tilePool.length) break;
+
+                var tile = state.mapGrid[r][c];
+                var poolObj = state.tilePool[poolIdx];
+                var x = c * config.tileSize + config.tileSize / 2;
+                var y = r * config.tileSize + config.tileSize / 2;
+
+                // Configure base rectangle
+                var color = 0x2ecc71; // Default Grass
+                var token = tile.token;
+
+                if (token.startsWith('w')) {
+                    if (token === 'w1') color = 0x5dade2;
+                    else if (token === 'w2') color = 0x3498db;
+                    else if (token === 'w3') color = 0x2874a6;
+                    else color = 0x3498db;
+                } else if (token === 'g2') {
+                    color = 0x27ae60;
+                } else if (token === 'r') {
+                    color = 0x27ae60;
+                } else if (token === 'b') {
+                    color = 0xf1c40f;
+                } else if (token.startsWith('i')) {
+                    color = 0x8bc34a;
+                }
+
+                poolObj.rect.setPosition(x, y).setFillStyle(color).setVisible(true);
+                poolObj.label.setPosition(x, y).setText(token).setVisible(true);
+
+                if (tile.type === 'incline' && tile.angle !== null) {
+                    poolObj.arrow.setPosition(x, y).setAngle(tile.angle).setVisible(true);
+                }
+
+                if (tile.type === 'tee') {
+                    poolObj.tee.marker.setPosition(x, y).setVisible(true);
+                    poolObj.tee.inner.setPosition(x, y).setVisible(true);
+                    poolObj.tee.text.setPosition(x, y).setVisible(true);
+                }
+
+                poolIdx++;
             }
         }
     };

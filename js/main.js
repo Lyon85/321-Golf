@@ -94,6 +94,7 @@
 
         try {
             Golf.createTerrains(scene);
+            Golf.initTilePool(scene);
         } catch (err) {
             console.error('[Main] Error creating terrains:', err);
         }
@@ -186,6 +187,7 @@
         }
 
         Golf.updateHoleArrow(scene);
+        Golf.updateMapVisibility(scene);
 
         // Send player input to server every frame
         // Golf.sendPlayerInput(scene); // Removing old placeholder
