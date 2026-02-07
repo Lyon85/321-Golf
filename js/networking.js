@@ -26,6 +26,12 @@
                     scene.cameras.main.startFollow(Golf.state.players[index].sprite, true, 0.1, 0.1);
                     console.log('Networking: Camera attached to P' + index);
                 }
+
+                // If I am Host and I have a selected tee, broadcast it
+                if (index === 0 && Golf.state.selectedTee) {
+                    console.log('Networking: Host broadcasting initial spawn:', Golf.state.selectedTee);
+                    Golf.Networking.sendSpawnUpdate(Golf.state.selectedTee);
+                }
             });
 
             // Initial Load of existing players
@@ -171,6 +177,12 @@
                 Golf.state.players.forEach(function (p) {
                     if (p.body) {
                         sceneRef.matter.body.setPosition(p.body, { x: pos.x, y: pos.y });
+                    }
+                    if (p.ball) {
+                        sceneRef.matter.body.setPosition(p.ball, { x: pos.x, y: pos.y });
+                    }
+                    if (p.sprite) {
+                        p.sprite.setPosition(pos.x, pos.y);
                     }
                 });
             });

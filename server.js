@@ -175,6 +175,11 @@ io.on('connection', (socket) => {
                 socket.emit('holeUpdate', room.holePosition);
             }
 
+            // Sync Spawn if exists
+            if (room.spawnPosition) {
+                socket.emit('spawnUpdate', room.spawnPosition);
+            }
+
         } else {
             socket.emit('errorMsg', 'Room not found');
         }
