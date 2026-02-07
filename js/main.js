@@ -108,8 +108,32 @@
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
 
-        var spawnX = state.spawnPoint ? state.spawnPoint.x : worldWidth / 2;
-        var spawnY = state.spawnPoint ? state.spawnPoint.y : worldHeight / 2;
+        var spawnX = worldWidth / 2;
+        var spawnY = worldHeight / 2;
+
+        var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+        if (state.spawnPositions && state.spawnPositions.length > 0) {
+            if (isHost) {
+                // Host picks a random spawn point
+                var randomIndex = Phaser.Math.Between(0, state.spawnPositions.length - 1);
+                state.selectedSpawn = state.spawnPositions[randomIndex];
+                console.log("[Main] Host selected spawn point:", state.selectedSpawn);
+
+                // Broadcast to guests
+                if (Golf.Networking && Golf.Networking.sendSpawnUpdate && state.myPlayerId !== null) {
+                    Golf.Networking.sendSpawnUpdate(state.selectedSpawn);
+                }
+            }
+
+            // If we have a selected spawn (picked by host or synced by guest), use it
+            if (state.selectedSpawn) {
+                spawnX = state.selectedSpawn.x;
+                spawnY = state.selectedSpawn.y;
+            } else if (state.spawnPoint) {
+                spawnX = state.spawnPoint.x;
+                spawnY = state.spawnPoint.y;
+            }
+        }
 
         state.players.push(
             Golf.createPlayer(scene, spawnX, spawnY, 0xff4757, false, 0)

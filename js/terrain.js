@@ -49,6 +49,9 @@
                     tileInfo.type = token;
                 } else if (token === 's' || token === 't') {
                     tileInfo.type = token === 's' ? 'spawn' : 'tee';
+                    if (!state.spawnPositions) state.spawnPositions = [];
+                    state.spawnPositions.push({ x: x, y: y });
+                    // Legacy support for single spawn point
                     state.spawnPoint = { x: x, y: y };
                 } else if (token === 'h') {
                     tileInfo.type = 'hole_position';

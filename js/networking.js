@@ -166,6 +166,18 @@
                 // Initiate a new random hole (Host only receives this)
                 Golf.spawnHole(sceneRef);
             });
+
+            // Spawn Sync
+            socket.on('spawnUpdate', function (pos) {
+                console.log('Networking: Spawn Update received', pos);
+                Golf.state.selectedSpawn = pos;
+                // If players already exist, we might need to teleport them, 
+                // but usually this arrives during init.
+                Golf.state.players.forEach(function (p) {
+                    sceneRef.matter.body.setPosition(p.body, { x: pos.x, y: pos.y });
+                    if (p.ball) sceneRef.matter.body.setPosition(p.ball, { x: pos.x, y: pos.y });
+                });
+            });
         },
 
         setupUI: function () {
@@ -252,6 +264,11 @@
         requestPickup: function (clubId) {
             if (!socket) return;
             socket.emit('requestPickup', clubId);
+        },
+
+        sendSpawnUpdate: function (pos) {
+            if (!socket) return;
+            socket.emit('spawnUpdate', pos);
         }
     };
 
