@@ -108,32 +108,9 @@
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
 
+        // Initial spawn fallback (overridden by Golf.loadMap)
         var spawnX = worldWidth / 2;
         var spawnY = worldHeight / 2;
-
-        var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
-        if (state.spawnPositions && state.spawnPositions.length > 0) {
-            if (isHost) {
-                // Host picks a random spawn point
-                var randomIndex = Phaser.Math.Between(0, state.spawnPositions.length - 1);
-                state.selectedSpawn = state.spawnPositions[randomIndex];
-                console.log("[Main] Host selected spawn point:", state.selectedSpawn);
-
-                // Broadcast to guests
-                if (Golf.Networking && Golf.Networking.sendSpawnUpdate && state.myPlayerId !== null) {
-                    Golf.Networking.sendSpawnUpdate(state.selectedSpawn);
-                }
-            }
-
-            // If we have a selected spawn (picked by host or synced by guest), use it
-            if (state.selectedSpawn) {
-                spawnX = state.selectedSpawn.x;
-                spawnY = state.selectedSpawn.y;
-            } else if (state.spawnPoint) {
-                spawnX = state.spawnPoint.x;
-                spawnY = state.spawnPoint.y;
-            }
-        }
 
         state.players.push(
             Golf.createPlayer(scene, spawnX, spawnY, 0xff4757, false, 0)
@@ -144,6 +121,33 @@
         state.players.push(
             Golf.createPlayer(scene, spawnX - 100, spawnY, 0xfeca57, false, 2)
         );
+
+        Golf.setSpawnPoint = function (pos) {
+            state.selectedSpawn = pos;
+            state.players.forEach(function (p, i) {
+                var offsetX = (i === 1) ? 100 : (i === 2 ? -100 : 0);
+                scene.matter.body.setPosition(p.body, { x: pos.x + offsetX, y: pos.y });
+                if (p.ball) scene.matter.body.setPosition(p.ball, { x: pos.x + offsetX + 60, y: pos.y });
+                p.lastSafePos = { x: pos.x + offsetX + 60, y: pos.y };
+            });
+            console.log("[Main] Spawn point synchronized:", pos);
+        };
+
+        // Determine initial spawn
+        if (state.spawnPositions && state.spawnPositions.length > 0) {
+            var isHost = (state.myPlayerId === 0);
+            var isSinglePlayer = (state.myPlayerId === null);
+
+            if (isHost || isSinglePlayer) {
+                var randomIndex = Phaser.Math.Between(0, state.spawnPositions.length - 1);
+                var pickedSpawn = state.spawnPositions[randomIndex];
+                Golf.setSpawnPoint(pickedSpawn);
+
+                if (isHost && Golf.Networking && Golf.Networking.sendSpawnUpdate) {
+                    Golf.Networking.sendSpawnUpdate(pickedSpawn);
+                }
+            }
+        }
 
 
         scene.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,E,SHIFT,ONE,TWO');
@@ -201,12 +205,11 @@
 
         var localPlayerIndex = state.myPlayerId !== null ? state.myPlayerId : 0;
         if (state.players[localPlayerIndex]) {
-            if (scene.cameraFollowFrames < 60) {
+            // Keep the camera locked to THE CURRENT local player
+            // If myPlayerId changes from null to 1, this will jump to P1
+            if (scene.cameras.main._follow !== state.players[localPlayerIndex].sprite) {
                 scene.cameras.main.startFollow(state.players[localPlayerIndex].sprite, true, 0.1, 0.1);
-                scene.cameraFollowFrames++;
-                if (scene.cameraFollowFrames === 1) {
-                    console.log('[Update] Camera forcefully following player', localPlayerIndex);
-                }
+                console.log('[Update] Camera focus shifted to player', localPlayerIndex);
             }
         }
 

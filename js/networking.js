@@ -20,12 +20,6 @@
             socket.on('assignPlayer', function (index) {
                 console.log('Networking: Assigned Player Index:', index);
                 Golf.state.myPlayerId = index;
-
-                // FORCE Camera Update immediately
-                if (Golf.state.players[index]) {
-                    scene.cameras.main.startFollow(Golf.state.players[index].sprite, true, 0.1, 0.1);
-                    console.log('Networking: Camera attached to P' + index);
-                }
             });
 
             // Initial Load of existing players
@@ -170,13 +164,11 @@
             // Spawn Sync
             socket.on('spawnUpdate', function (pos) {
                 console.log('Networking: Spawn Update received', pos);
-                Golf.state.selectedSpawn = pos;
-                // If players already exist, we might need to teleport them, 
-                // but usually this arrives during init.
-                Golf.state.players.forEach(function (p) {
-                    sceneRef.matter.body.setPosition(p.body, { x: pos.x, y: pos.y });
-                    if (p.ball) sceneRef.matter.body.setPosition(p.ball, { x: pos.x, y: pos.y });
-                });
+                if (Golf.setSpawnPoint) {
+                    Golf.setSpawnPoint(pos);
+                } else {
+                    Golf.state.selectedSpawn = pos;
+                }
             });
         },
 

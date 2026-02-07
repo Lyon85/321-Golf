@@ -44,27 +44,7 @@
 
                 var tileInfo = { type: 'grass', angle: null, depth: null, token: baseToken, modifiers: modifiers };
 
-                // Handle legacy tokens and modifiers
-                var isTee = modifiers.includes('t') || token === 't' || token === 's';
-                var isHole = modifiers.includes('h') || token === 'h';
-
-                if (isTee) {
-                    tileInfo.type = 'tee';
-                    state.spawnPositions.push({ x: x, y: y });
-                    state.spawnPoint = { x: x, y: y }; // Legacy support
-                }
-
-                if (isHole) {
-                    // If it was already a tee, it can also be a hole
-                    if (tileInfo.type === 'tee') {
-                        tileInfo.alsoHole = true;
-                    } else {
-                        tileInfo.type = 'hole_position';
-                    }
-                    state.holePositions.push({ x: x, y: y, row: r, col: c });
-                }
-
-                // Determine tile type from baseToken
+                // 1. Determine base terrain type from baseToken
                 if (baseToken.startsWith('w')) {
                     tileInfo.type = 'water';
                     scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
@@ -72,7 +52,6 @@
                         collisionFilter: { category: CAT_TERRAIN }
                     });
                 } else if (baseToken.startsWith('g')) {
-                    // already grass by default, but set type explicitly if mapping depends on it
                     tileInfo.type = 'grass';
                 } else if (baseToken === 'r') {
                     tileInfo.type = 'rough';
@@ -83,6 +62,25 @@
                 } else if (baseToken.startsWith('i')) {
                     tileInfo.type = 'incline';
                     tileInfo.angle = parseInt(baseToken.substring(1));
+                }
+
+                // 2. Override/Augment with special modifiers
+                var isTee = modifiers.includes('t') || token === 't' || token === 's';
+                var isHole = modifiers.includes('h') || token === 'h';
+
+                if (isTee) {
+                    tileInfo.type = 'tee';
+                    state.spawnPositions.push({ x: x, y: y });
+                    state.spawnPoint = { x: x, y: y }; // Legacy support
+                }
+
+                if (isHole) {
+                    if (tileInfo.type === 'tee') {
+                        tileInfo.alsoHole = true;
+                    } else {
+                        tileInfo.type = 'hole_position';
+                    }
+                    state.holePositions.push({ x: x, y: y, row: r, col: c });
                 }
 
                 state.mapGrid[r][c] = tileInfo;
