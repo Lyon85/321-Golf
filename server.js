@@ -73,25 +73,18 @@ function generateRoomCode() {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    socket.on('createRoom', () => {
+    socket.on('createRoom', (data) => {
         try {
             const code = generateRoomCode();
             console.log(`[Server] Creating room ${code} for host ${socket.id}`);
 
             const clubs = generateFixedClubs(5000, 1500);
-            console.log(`[Server] Clubs generated: ${clubs ? clubs.length : 'NULL'}`);
-            // Verify serializability
-            try {
-                JSON.stringify(clubs);
-            } catch (jsonErr) {
-                console.error('[Server] Club data is not serializable!', jsonErr);
-            }
 
             rooms[code] = {
                 players: {},
                 carts: [],
-                // Map Config matched to client (20 cols * 250 tile = 5000, 6 rows * 250 = 1500)
                 clubs: clubs,
+                spawnPosition: data ? data.spawnPosition : null,
                 started: false
             };
             socket.join(code);

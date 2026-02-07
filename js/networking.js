@@ -26,12 +26,6 @@
                     scene.cameras.main.startFollow(Golf.state.players[index].sprite, true, 0.1, 0.1);
                     console.log('Networking: Camera attached to P' + index);
                 }
-
-                // If I am Host and I have a selected tee, broadcast it
-                if (index === 0 && Golf.state.selectedTee) {
-                    console.log('Networking: Host broadcasting initial spawn:', Golf.state.selectedTee);
-                    Golf.Networking.sendSpawnUpdate(Golf.state.selectedTee);
-                }
             });
 
             // Initial Load of existing players
@@ -222,7 +216,21 @@
                     e.stopPropagation();
                     console.log('Networking: Create Room Clicked');
                     if (socket) {
-                        socket.emit('createRoom');
+                        var spawnPos = null;
+                        if (Golf.state.teePositions && Golf.state.teePositions.length > 0) {
+                            var rnd = Math.floor(Math.random() * Golf.state.teePositions.length);
+                            spawnPos = Golf.state.teePositions[rnd];
+                            Golf.state.selectedTee = spawnPos;
+                            console.log('Networking: Host selected spawn for room:', spawnPos);
+
+                            // Reposition local players immediately
+                            Golf.state.players.forEach(function (p) {
+                                if (p.body) sceneRef.matter.body.setPosition(p.body, { x: spawnPos.x, y: spawnPos.y });
+                                if (p.ball) sceneRef.matter.body.setPosition(p.ball, { x: spawnPos.x, y: spawnPos.y });
+                                if (p.sprite) p.sprite.setPosition(spawnPos.x, spawnPos.y);
+                            });
+                        }
+                        socket.emit('createRoom', { spawnPosition: spawnPos });
                     } else {
                         console.error('Networking: Socket not initialized');
                     }
