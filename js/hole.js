@@ -4,7 +4,7 @@
     var CAT_HOLE = Golf.CAT_HOLE;
     var CAT_BALL = Golf.CAT_BALL;
 
-    var HOLE_RADIUS = 35;
+    var HOLE_RADIUS = 15;
 
     function createHoleArrow(scene) {
         var arrowSize = 24;
@@ -35,6 +35,8 @@
             yoyo: true,
             repeat: -1
         });
+
+        createHoleArrow(scene);
         Golf.spawnHole(scene);
 
         state.holeSensor = scene.matter.add.circle(state.hole.x, state.hole.y, HOLE_RADIUS, {
@@ -68,8 +70,6 @@
                 break;
             }
         });
-
-        createHoleArrow(scene);
     };
 
     Golf.spawnHole = function (scene, forceX, forceY) {
@@ -94,46 +94,36 @@
             return;
         }
 
-        var config = Golf.MAP_CONFIG;
-        var worldWidth = config.cols * config.tileSize;
-        var worldHeight = config.rows * config.tileSize;
+        // Use predetermined hole positions from the map
+        if (!state.holePositions || state.holePositions.length === 0) {
+            console.warn('No hole positions defined in map!');
+            return;
+        }
 
-        // Use player spawn as reference for minimum distance
-        var refX = state.spawnPoint ? state.spawnPoint.x : worldWidth / 2;
-        var refY = state.spawnPoint ? state.spawnPoint.y : worldHeight / 2;
+        // Select a random hole position
+        var randomIndex = Phaser.Math.Between(0, state.holePositions.length - 1);
+        var holePos = state.holePositions[randomIndex];
 
-        var hx, hy, dist;
-        // Dynamic min distance: 30% of map width or at least 500px
-        var minDistance = Math.max(500, worldWidth * 0.3);
-        var margin = 50; // Keep away from the very edge of tiles
-
-        var attempts = 0;
-        do {
-            hx = Phaser.Math.Between(margin, worldWidth - margin);
-            hy = Phaser.Math.Between(margin, worldHeight - margin);
-            dist = Phaser.Math.Distance.Between(refX, refY, hx, hy);
-
-            // Check if this spot is on water
-            var gridC = Math.floor(hx / config.tileSize);
-            var gridR = Math.floor(hy / config.tileSize);
-            var isWater = false;
-            if (state.mapGrid && state.mapGrid[gridR] && state.mapGrid[gridR][gridC]) {
-                isWater = state.mapGrid[gridR][gridC].type === 'water';
-            }
-
-            attempts++;
-        } while ((dist < minDistance || isWater) && attempts < 100);
+        var hx = holePos.x;
+        var hy = holePos.y;
 
         state.hole.setPosition(hx, hy);
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
-        console.log("Hole spawned at: " + hx + ", " + hy + " (dist from spawn: " + dist.toFixed(0) + ")");
+        console.log("Hole spawned at predetermined position " + (randomIndex + 1) + ": " + hx + ", " + hy);
+
+        // Update UI if available
+        if (scene.holeDisplay) {
+            scene.holeDisplay.textContent = 'Hole: ' + (randomIndex + 1);
+        }
 
         // Broadcast new position if Multiplayer
         if (Golf.Networking && Golf.Networking.sendHoleUpdate && state.myPlayerId !== null) {
             Golf.Networking.sendHoleUpdate(hx, hy);
         }
+
+        Golf.updateHoleArrow(scene);
     };
 
     Golf.updateHoleArrow = function (scene) {

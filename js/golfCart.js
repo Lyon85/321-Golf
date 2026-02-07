@@ -94,7 +94,7 @@
         var terrainGripMult = terrain && terrain.cartGripMult !== undefined ? terrain.cartGripMult : 1.0;
         var terrainSpeedMult = terrain && terrain.cartMaxSpeedMult !== undefined ? terrain.cartMaxSpeedMult : 1.0;
 
-        var grip = 0.8 * terrainGripMult; // Reduce lateral sliding
+        var grip = 0.5 * terrainGripMult; // Reduce lateral sliding
 
         scene.matter.body.setVelocity(cart.body, {
             x: curVel.x - latVel * lx * grip,
@@ -111,7 +111,7 @@
             p.turboRamp = Math.max(0, p.turboRamp - 0.002 * dt);
         }
 
-        var baseMax = 8 * terrainSpeedMult;
+        var baseMax = 4 * terrainSpeedMult;
         var turboBoost = 3.0 * terrainSpeedMult;
         var currentMax = baseMax + turboBoost * p.turboRamp;
 
@@ -119,7 +119,7 @@
         var turboForceBoost = 0.008 * terrainSpeedMult;
         var force = (baseForce + turboForceBoost * p.turboRamp) * speedScale;
 
-        var torque = 0.8 * speedScale;
+        var torque = 2 * speedScale;
         var angle = cart.body.angle - Math.PI / 2;
 
         if (keys.W) {

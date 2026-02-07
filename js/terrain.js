@@ -24,17 +24,40 @@
                 var x = c * config.tileSize + config.tileSize / 2;
                 var y = r * config.tileSize + config.tileSize / 2;
 
-                var tileInfo = { type: 'grass', angle: null };
+                var tileInfo = { type: 'grass', angle: null, depth: null };
                 var color = 0x2ecc71; // Default Grass
 
-                if (token === 'w') {
+                // Water with depth variations
+                if (token.startsWith('w')) {
                     tileInfo.type = 'water';
-                    color = 0x3498db;
+                    if (token === 'w1') {
+                        tileInfo.depth = 1; // Shallow
+                        color = 0x5dade2; // Light blue
+                    } else if (token === 'w2') {
+                        tileInfo.depth = 2; // Medium
+                        color = 0x3498db; // Medium blue
+                    } else if (token === 'w3') {
+                        tileInfo.depth = 3; // Deep
+                        color = 0x2874a6; // Dark blue
+                    } else {
+                        tileInfo.depth = 2; // Default to medium
+                        color = 0x3498db;
+                    }
                     // Add water sensor
                     scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
                         isStatic: true, isSensor: true, label: 'water',
                         collisionFilter: { category: CAT_TERRAIN }
                     });
+                    // Grass variations
+                } else if (token.startsWith('g')) {
+                    tileInfo.type = 'grass';
+                    if (token === 'g1') {
+                        color = 0x2ecc71; // Standard grass
+                    } else if (token === 'g2') {
+                        color = 0x27ae60; // Slightly darker grass
+                    } else {
+                        color = 0x2ecc71; // Default
+                    }
                 } else if (token === 'r') {
                     tileInfo.type = 'rough';
                     color = 0x27ae60;
@@ -46,6 +69,20 @@
                     color = 0x2ecc71; // Keep grass color
                     state.spawnPoint = { x: x, y: y };
                     console.log("Spawn point set at: " + x + ", " + y);
+                    // Tee-off position (player spawn)
+                } else if (token === 't') {
+                    tileInfo.type = 'tee';
+                    color = 0x2ecc71; // Grass color
+                    // Tee is the actual spawn point
+                    state.spawnPoint = { x: x, y: y };
+                    console.log("Tee/Spawn point set at: " + x + ", " + y);
+                    // Hole position (predetermined locations for holes to appear)
+                } else if (token === 'h') {
+                    tileInfo.type = 'hole_position';
+                    color = 0x2ecc71; // Grass color (no visual marker yet)
+                    // Store hole position for random spawning
+                    if (!state.holePositions) state.holePositions = [];
+                    state.holePositions.push({ x: x, y: y, row: r, col: c });
                 } else if (token.startsWith('i')) {
                     tileInfo.type = 'incline';
                     tileInfo.angle = parseInt(token.substring(1));
@@ -77,6 +114,24 @@
                     worldGroup.add(arrow);
                 }
 
+                // Add tee marker
+                if (tileInfo.type === 'tee') {
+                    var teeMarker = scene.add.circle(x, y, 12, 0xff0000).setDepth(-9);
+                    worldGroup.add(teeMarker);
+                    var teeInner = scene.add.circle(x, y, 8, 0xff6b6b).setDepth(-8);
+                    worldGroup.add(teeInner);
+                    var teeText = scene.add.text(x, y, 'TEE', {
+                        family: 'monospace',
+                        fontSize: '12px',
+                        color: '#ffffff',
+                        fontStyle: 'bold'
+                    }).setOrigin(0.5).setDepth(-7);
+                    worldGroup.add(teeText);
+                }
+
+                // Don't render hole markers yet - they'll be spawned dynamically
+                // Hole positions are stored in state.holePositions for random selection
+
                 state.mapGrid[r][c] = tileInfo;
             }
         }
@@ -102,6 +157,55 @@
         }
         return { x: 0, y: 0 };
     };
+
+    /**
+     * Spawns a hole at a random predetermined position.
+     * Call this at game start and after each successful putt.
+     */
+    Golf.spawnRandomHole = function (scene) {
+        // Remove existing hole if any
+        if (state.currentHole) {
+            if (state.currentHole.circle) state.currentHole.circle.destroy();
+            if (state.currentHole.inner) state.currentHole.inner.destroy();
+            if (state.currentHole.flagPole) state.currentHole.flagPole.destroy();
+            if (state.currentHole.flag) state.currentHole.flag.destroy();
+            state.currentHole = null;
+        }
+
+        // Select a random hole position
+        if (!state.holePositions || state.holePositions.length === 0) {
+            console.warn('No hole positions defined in map!');
+            return;
+        }
+
+        var randomIndex = Phaser.Math.Between(0, state.holePositions.length - 1);
+        var holePos = state.holePositions[randomIndex];
+
+        console.log('Spawning hole at position:', holePos);
+
+        // Create hole visual
+        var holeCircle = scene.add.circle(holePos.x, holePos.y, 12, 0x000000).setDepth(-9);
+        var holeInner = scene.add.circle(holePos.x, holePos.y, 8, 0x1a1a1a).setDepth(-8);
+        var flagPole = scene.add.line(holePos.x, holePos.y, 0, 0, 0, -30, 0x8b4513, 2).setOrigin(0, 0).setDepth(-7);
+        var flag = scene.add.triangle(holePos.x, holePos.y - 30, 0, 0, 15, -8, 0, -16, 0xff0000).setDepth(-7);
+
+        // Store current hole reference
+        state.currentHole = {
+            x: holePos.x,
+            y: holePos.y,
+            circle: holeCircle,
+            inner: holeInner,
+            flagPole: flagPole,
+            flag: flag,
+            index: randomIndex
+        };
+
+        // Update UI if available
+        if (scene.holeDisplay) {
+            scene.holeDisplay.textContent = 'Hole: ' + (randomIndex + 1);
+        }
+    };
+
 
 
 

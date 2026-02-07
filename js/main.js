@@ -92,8 +92,17 @@
 
 
 
-        Golf.createHole(scene);
-        Golf.createTerrains(scene);
+        try {
+            Golf.createTerrains(scene);
+        } catch (err) {
+            console.error('[Main] Error creating terrains:', err);
+        }
+
+        try {
+            Golf.createHole(scene);
+        } catch (err) {
+            console.error('[Main] Error creating hole:', err);
+        }
 
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
