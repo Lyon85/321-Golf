@@ -105,8 +105,14 @@
             console.error('[Main] Error creating hole:', err);
         }
 
-        state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
+
+        // Pick a random tee for single-player (Networking will override if active)
+        if (state.teePositions && state.teePositions.length > 0) {
+            var randomIndex = Math.floor(Math.random() * state.teePositions.length);
+            state.spawnPoint = { x: state.teePositions[randomIndex].x, y: state.teePositions[randomIndex].y };
+            console.log('[Main] Single-player random spawn selected:', state.spawnPoint);
+        }
 
         var spawnX = state.spawnPoint ? state.spawnPoint.x : worldWidth / 2;
         var spawnY = state.spawnPoint ? state.spawnPoint.y : worldHeight / 2;
@@ -444,6 +450,21 @@
             matter: { gravity: { y: 0 }, debug: false }
         },
         scene: { preload: preload, create: create, update: update }
+    };
+
+    Golf.repositionPlayers = function (scene) {
+        if (!state.spawnPoint) return;
+        console.log('[Golf] Repositioning all players to:', state.spawnPoint);
+        state.players.forEach(function (p, index) {
+            var offset = (index - 1) * 20; // Slight offset so they don't overlap perfectly
+            scene.matter.body.setPosition(p.body, { x: state.spawnPoint.x + offset, y: state.spawnPoint.y });
+
+            // Sync ball too
+            if (p.ball) {
+                scene.matter.body.setPosition(p.ball, { x: state.spawnPoint.x + offset, y: state.spawnPoint.y });
+                scene.matter.body.setVelocity(p.ball, { x: 0, y: 0 });
+            }
+        });
     };
 
     new Phaser.Game(config);
