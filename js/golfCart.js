@@ -109,7 +109,7 @@
         var turboBoost = 3.0 * terrainSpeedMult;
         var currentMax = baseMax + turboBoost * p.turboRamp;
 
-        var baseForce = 0.02 * terrainSpeedMult;
+        var baseForce = 0.2 * terrainSpeedMult;
         var turboForceBoost = 0.008 * terrainSpeedMult;
         var force = baseForce + turboForceBoost * p.turboRamp;
 

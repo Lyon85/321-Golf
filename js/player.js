@@ -8,8 +8,8 @@
 
     Golf.createPlayer = function (scene, x, y, color, isAI, playerIndex) {
         var pBody = scene.matter.add.rectangle(x, y, 32, 40, {
-            friction: 0.1,
-            frictionAir: 0.03,
+            friction: 0.005,
+            frictionAir: 0.01,
             label: 'player',
             height: 12,
             collisionFilter: {

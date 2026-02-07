@@ -1,3 +1,14 @@
 # php -- BEGIN cPanel-generated handler, do not edit
 # This domain inherits the “PHP” package.
 # php -- END cPanel-generated handler, do not edit
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/cl8d/public_html/321"
+PassengerBaseURI "/321"
+PassengerNodejs "/home/cl8d/nodevenv/public_html/321/20/bin/node"
+PassengerAppType node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END

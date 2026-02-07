@@ -1,14 +1,24 @@
 const express = require('express');
 const app = express();
-const http = require('http').Server(app);
-const io = require('socket.io')(http);
+const http = require('http').createServer(app);
+
+const { Server } = require("socket.io"); // <-- make sure to require Server
+const io = new Server(http, {
+    path: "/321/socket.io" // must match the URL base
+});
+
 const path = require('path');
 
+// Serve static files
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+// your existing Socket.IO logic goes here...
+// e.g., io.on('connection', socket => { ... });
+
 
 // Rooms State
 // Dictionary of roomCode -> { players: {}, carts: [], started: false }
@@ -260,5 +270,4 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log('--- SERVER RESTARTED with CLUB FIXES (v3) ---'); // Version flag
 });

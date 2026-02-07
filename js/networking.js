@@ -7,10 +7,9 @@
         init: function (scene) {
             sceneRef = scene;
             console.log('Networking: Initializing... (Client v3 with Debug Logs)');
- socket = io("/321", {
-  path: "/321/socket.io"
-});
-
+            socket = io("/321", {
+                path: "/321/socket.io"
+            });
 
             this.setupUI();
 
