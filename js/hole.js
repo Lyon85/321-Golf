@@ -4,7 +4,7 @@
     var CAT_HOLE = Golf.CAT_HOLE;
     var CAT_BALL = Golf.CAT_BALL;
 
-    var HOLE_RADIUS = 35;
+    var HOLE_RADIUS = 15;
 
     function createHoleArrow(scene) {
         var arrowSize = 24;
@@ -35,6 +35,8 @@
             yoyo: true,
             repeat: -1
         });
+
+        createHoleArrow(scene);
         Golf.spawnHole(scene);
 
         state.holeSensor = scene.matter.add.circle(state.hole.x, state.hole.y, HOLE_RADIUS, {
@@ -68,25 +70,60 @@
                 break;
             }
         });
-
-        createHoleArrow(scene);
     };
 
-    Golf.spawnHole = function (scene) {
-        var HALF = 10000;
-        var hx, hy, dist;
-        var minDistance = 3000;
+    Golf.spawnHole = function (scene, forceX, forceY) {
+        // If coordinates provided (from Server), use them directly
+        if (forceX !== undefined && forceY !== undefined) {
+            state.hole.setPosition(forceX, forceY);
+            if (state.holeSensor) {
+                scene.matter.body.setPosition(state.holeSensor, { x: forceX, y: forceY });
+            }
+            console.log("Hole synced to: " + forceX + ", " + forceY);
+            Golf.updateHoleArrow(scene);
+            return;
+        }
 
-        do {
-            hx = Phaser.Math.Between(1000, 19000);
-            hy = Phaser.Math.Between(1000, 19000);
-            dist = Phaser.Math.Distance.Between(HALF, HALF, hx, hy);
-        } while (dist < minDistance);
+        // Host-Authoritative Logic:
+        // Only Host (myPlayerId === 0) or Singleplayer (myPlayerId === null) generates holes.
+        // Guests do nothing but wait for 'holeUpdate'.
+        var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+
+        if (!isHost) {
+            console.log("Guest: Waiting for hole update from Host...");
+            return;
+        }
+
+        // Use predetermined hole positions from the map
+        if (!state.holePositions || state.holePositions.length === 0) {
+            console.warn('No hole positions defined in map!');
+            return;
+        }
+
+        // Select a random hole position
+        var randomIndex = Phaser.Math.Between(0, state.holePositions.length - 1);
+        var holePos = state.holePositions[randomIndex];
+
+        var hx = holePos.x;
+        var hy = holePos.y;
 
         state.hole.setPosition(hx, hy);
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
+        console.log("Hole spawned at predetermined position " + (randomIndex + 1) + ": " + hx + ", " + hy);
+
+        // Update UI if available
+        if (scene.holeDisplay) {
+            scene.holeDisplay.textContent = 'Hole: ' + (randomIndex + 1);
+        }
+
+        // Broadcast new position if Multiplayer
+        if (Golf.Networking && Golf.Networking.sendHoleUpdate && state.myPlayerId !== null) {
+            Golf.Networking.sendHoleUpdate(hx, hy);
+        }
+
+        Golf.updateHoleArrow(scene);
     };
 
     Golf.updateHoleArrow = function (scene) {
@@ -115,7 +152,16 @@
             alert('ROUND OVER! You finished 10 holes!');
             window.location.reload();
         } else {
-            Golf.spawnHole(scene);
+            // Updated Hole Generation Logic:
+            var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+            if (isHost) {
+                Golf.spawnHole(scene);
+            } else {
+                // Request Host to spawn new hole
+                if (Golf.Networking && Golf.Networking.requestNewHole) {
+                    Golf.Networking.requestNewHole();
+                }
+            }
         }
     };
 })(typeof window !== 'undefined' ? window : this);

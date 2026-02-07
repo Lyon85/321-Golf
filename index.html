@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <!-- Load Phaser 3 -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 
 <body>
@@ -23,18 +23,26 @@
             <p><strong>Left Click</strong>: Hold to Aim & Power, Release to Hit</p>
             <p><strong>Goal</strong>: Sink your ball in 10 holes before the AI!</p>
             <div id="multiplayer-controls">
-                <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 5px;">Share your ID with a friend, or paste
-                    theirs below:</p>
+                <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 5px;">Create or join a room to play together:
+                </p>
+
                 <div class="lobby-section">
-                    <label>My ID: <span id="my-id">Loading...</span></label>
-                    <button id="copy-id-btn">Copy</button>
+                    <button id="create-room-btn">Create Room</button>
                 </div>
-                <div class="lobby-section">
-                    <input type="text" id="friend-id-input" placeholder="Friend's ID">
-                    <button id="join-btn">Join Game</button>
+
+                <div class="lobby-section"
+                    style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <label>Room Code: <span id="room-code">...</span></label>
+                    <button id="copy-code-btn" style="display:none;">Copy</button>
+                </div>
+
+                <div class="lobby-section" style="margin-top: 15px;">
+                    <input type="text" id="room-code-input" placeholder="ABCD" maxlength="4">
+                    <button id="join-room-btn">Join Room</button>
                 </div>
             </div>
-            <p class="hint">Press SPACE or CLICK to Start</p>
+            <p id="lobby-status" class="hint">Waiting for Players</p>
+            <p id="ready-status" class="hint hidden"></p>
         </div>
         <div id="countdown" class="hidden">3</div>
         <div id="power-meter-container" class="hidden">
@@ -52,20 +60,22 @@
             <div id="speed-unit">KM/H</div>
         </div>
     </div>
-    <script src="js/constants.js"></script>
-    <script src="js/state.js"></script>
-    <script src="js/player.js"></script>
-    <script src="js/clubs.js"></script>
-    <script src="js/hole.js"></script>
-    <script src="js/countdown.js"></script>
-    <script src="js/golfCart.js"></script>
-    <script src="js/movement.js"></script>
-    <script src="js/aiming.js"></script>
-    <script src="js/ai.js"></script>
-    <script src="js/town.js"></script>
-    <script src="js/terrain.js"></script>
-    <script src="js/networking.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/constants.js?v3.0.3"></script>
+    <script src="js/map.js?v3.0.3"></script>
+    <script src="js/assets.js?v3.0.3"></script>
+    <script src="js/state.js?v3.0.3"></script>
+    <script src="js/player.js?v3.0.3"></script>
+    <script src="js/clubs.js?v3.0.3"></script>
+    <script src="js/hole.js?v3.0.3"></script>
+    <script src="js/countdown.js?v3.0.3"></script>
+    <script src="js/golfCart.js?v3.0.3"></script>
+    <script src="js/movement.js?v3.0.3"></script>
+    <script src="js/aiming.js?v3.0.3"></script>
+    <script src="js/ai.js?v3.0.3"></script>
+    <script src="js/town.js?v3.0.3"></script>
+    <script src="js/terrain.js?v3.0.3"></script>
+    <script src="js/networking.js?v3.0.3"></script>
+    <script src="js/main.js?v3.0.3"></script>
 </body>
 
 </html>

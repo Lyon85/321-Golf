@@ -271,3 +271,34 @@ body {
     font-size: 0.8rem;
     padding: 6px 12px;
 }
+
+.room-btn {
+    background: var(--secondary);
+    border: 2px solid var(--accent);
+    color: white;
+    padding: 12px 30px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 200px;
+}
+
+.room-btn:hover {
+    background: var(--accent);
+    color: var(--secondary);
+    transform: scale(1.05);
+}
+
+.room-btn.active {
+    background: #e67e22;
+    border-color: #d35400;
+}
+
+.room-btn.full {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: #666;
+}
