@@ -19,8 +19,7 @@
             .then(text => {
                 const lines = text.trim().split("\n");
 
-                // Join into one string so replace works
-                Golf.MAP_DATA = lines.join(",");  // <-- key change
+                Golf.MAP_DATA = lines;
 
                 Golf.MAP_CONFIG.rows = lines.length;
                 Golf.MAP_CONFIG.cols = lines[0].split(",").length;

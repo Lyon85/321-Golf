@@ -11,6 +11,7 @@
         golfCarts: [],
         currentHoleIndex: 0,
         spawnPositions: [], // Array of {x, y} for Tee tiles
+        holePositions: [],  // Array of {x, y} for Hole tiles
         availableHoles: [], // "Shuffle bag" for hole rotation
         selectedSpawn: null, // Host-selected spawn for this game
         isMatchActive: false,
