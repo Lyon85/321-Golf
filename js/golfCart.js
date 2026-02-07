@@ -67,7 +67,7 @@
         });
     };
 
-    Golf.handleDriving = function (scene, p, overrideKeys) {
+    Golf.handleDriving = function (scene, p, overrideKeys, delta) {
         var cart = p.driving;
         var keys = overrideKeys || {
             W: scene.keys.W.isDown,
@@ -76,6 +76,11 @@
             D: scene.keys.D.isDown,
             SHIFT: scene.keys.SHIFT.isDown
         };
+
+        // Normalize based on 60 FPS
+        var dt = delta || 16.666;
+        if (dt > 100) dt = 100;
+        var speedScale = dt / 16.666;
 
         // Grip physics (Lateral Friction)
         var sideAngle = cart.body.angle;
@@ -99,10 +104,11 @@
         var isTurbo = keys.SHIFT;
 
         if (!p.turboRamp) p.turboRamp = 0;
+        // Scale turbo ramp by delta time (0.016 per 16.666ms frame = 0.001 per ms)
         if (isTurbo && keys.W) {
-            p.turboRamp = Math.min(1, p.turboRamp + 0.016);
+            p.turboRamp = Math.min(1, p.turboRamp + 0.001 * dt);
         } else if (!isTurbo) {
-            p.turboRamp = Math.max(0, p.turboRamp - 0.032);
+            p.turboRamp = Math.max(0, p.turboRamp - 0.002 * dt);
         }
 
         var baseMax = 8 * terrainSpeedMult;
@@ -111,9 +117,9 @@
 
         var baseForce = 0.2 * terrainSpeedMult;
         var turboForceBoost = 0.008 * terrainSpeedMult;
-        var force = baseForce + turboForceBoost * p.turboRamp;
+        var force = (baseForce + turboForceBoost * p.turboRamp) * speedScale;
 
-        var torque = 0.8;
+        var torque = 0.8 * speedScale;
         var angle = cart.body.angle - Math.PI / 2;
 
         if (keys.W) {

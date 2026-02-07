@@ -156,7 +156,7 @@
         Golf.setupStartTrigger(scene);
     }
 
-    function update() {
+    function update(time, delta) {
         var scene = this;
         if (state.isWaitingToStart) return;
         if (scene.sinkCooldownFrames > 0) scene.sinkCooldownFrames--;
@@ -194,7 +194,7 @@
             var isLocalPlayer = (state.myPlayerId === null && index === 0) || (index === state.myPlayerId);
 
             if (isLocalPlayer && !p.isAI) {
-                handleHumanInput(scene, p);
+                handleHumanInput(scene, p, delta);
             }
 
             // Update animations based on state
@@ -380,11 +380,11 @@
 
     }
 
-    function handleHumanInput(scene, p) {
+    function handleHumanInput(scene, p, delta) {
         if (p.driving) {
-            Golf.handleDriving(scene, p);
+            Golf.handleDriving(scene, p, null, delta);
         } else {
-            Golf.handlePlayerMovement(scene, p);
+            Golf.handlePlayerMovement(scene, p, null, delta);
             Golf.handleAiming(scene, p);
         }
     }
@@ -414,9 +414,9 @@
 
         // Use custom handleHumanInput-like logic but with remote inputs
         if (p.driving) {
-            Golf.handleDriving(scene, p, p.remoteKeys);
+            Golf.handleDriving(scene, p, p.remoteKeys, 16.66);
         } else {
-            Golf.handlePlayerMovement(scene, p, p.remoteKeys);
+            Golf.handlePlayerMovement(scene, p, p.remoteKeys, 16.66);
             if (p.remotePointer) {
                 Golf.handleAiming(scene, p, p.remotePointer);
             }
