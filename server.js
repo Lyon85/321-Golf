@@ -92,8 +92,8 @@ io.on('connection', (socket) => {
                 carts: [],
                 // Map Config matched to client (20 cols * 250 tile = 5000, 6 rows * 250 = 1500)
                 clubs: clubs,
-                spawnPoint: null, // Host will select and sync this
-                started: false
+                started: false,
+                spawnPoint: null
             };
             socket.join(code);
 
@@ -176,9 +176,9 @@ io.on('connection', (socket) => {
                 socket.emit('holeUpdate', room.holePosition);
             }
 
-            // Sync Spawn if exists
+            // Sync Spawn Point if set
             if (room.spawnPoint) {
-                socket.emit('spawnSet', room.spawnPoint);
+                socket.emit('spawnPointUpdate', room.spawnPoint);
             }
 
         } else {
@@ -241,15 +241,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle Spawn Sync
-    socket.on('setSpawn', (pos) => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
-        if (code && rooms[code]) {
-            rooms[code].spawnPoint = pos; // Persist for new joiners
-            socket.to(code).emit('spawnSet', pos); // Broadcast to others
-        }
-    });
-
     socket.on('requestNewHole', () => {
         const code = Array.from(socket.rooms).find(r => r !== socket.id);
         if (code && rooms[code]) {
@@ -258,6 +249,15 @@ io.on('connection', (socket) => {
             if (hostId) {
                 io.to(hostId).emit('forceSpawnHole');
             }
+        }
+    });
+
+    socket.on('setSpawnPoint', (pos) => {
+        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        if (code && rooms[code]) {
+            rooms[code].spawnPoint = pos;
+            console.log(`[Server] Room ${code} spawn point set to:`, pos);
+            io.to(code).emit('spawnPointUpdate', pos);
         }
     });
 

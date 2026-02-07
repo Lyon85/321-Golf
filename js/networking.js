@@ -21,22 +21,45 @@
                 console.log('Networking: Assigned Player Index:', index);
                 Golf.state.myPlayerId = index;
 
-                // Host selects a random tee and broadcasts it
+                // Host Logic: Pick Random Tee
                 if (index === 0 && Golf.state.teePositions && Golf.state.teePositions.length > 0) {
-                    var randomIndex = Math.floor(Math.random() * Golf.state.teePositions.length);
-                    var spawnPos = Golf.state.teePositions[randomIndex];
-                    console.log('Networking: Host selected random spawn:', spawnPos);
-                    socket.emit('setSpawn', spawnPos);
+                    var tees = Golf.state.teePositions;
+                    var randomTee = tees[Math.floor(Math.random() * tees.length)];
+                    console.log('Networking: Host selected tee:', randomTee);
 
-                    // Also update locally immediately
-                    Golf.state.spawnPoint = { x: spawnPos.x, y: spawnPos.y };
-                    Golf.repositionPlayers(scene);
+                    // Optimistically set local
+                    Golf.state.spawnPoint = randomTee;
+
+                    // Tell server to sync everyone
+                    if (socket) socket.emit('setSpawnPoint', randomTee);
                 }
 
                 // FORCE Camera Update immediately
                 if (Golf.state.players[index]) {
                     scene.cameras.main.startFollow(Golf.state.players[index].sprite, true, 0.1, 0.1);
                     console.log('Networking: Camera attached to P' + index);
+                }
+            });
+
+            socket.on('spawnPointUpdate', function (pos) {
+                console.log('Networking: Received Spawn Point Update:', pos);
+                Golf.state.spawnPoint = pos;
+
+                // Teleport existing players if they exist
+                if (Golf.state.players && Golf.state.players.length > 0) {
+                    var offsets = [0, 100, -100]; // Defined in main.js creation
+                    Golf.state.players.forEach(function (p, i) {
+                        var offX = offsets[i] !== undefined ? offsets[i] : 0;
+                        var newX = pos.x + offX;
+                        var newY = pos.y;
+
+                        scene.matter.body.setPosition(p.body, { x: newX, y: newY });
+                        p.sprite.setPosition(newX, newY);
+                        if (p.ball) {
+                            scene.matter.body.setPosition(p.ball, { x: newX + 60, y: newY });
+                            p.ballSprite.setPosition(newX + 60, newY);
+                        }
+                    });
                 }
             });
 
@@ -177,12 +200,6 @@
                 console.log('Networking: Host requested to spawn new hole');
                 // Initiate a new random hole (Host only receives this)
                 Golf.spawnHole(sceneRef);
-            });
-
-            socket.on('spawnSet', function (pos) {
-                console.log('Networking: Received synchronized spawn point:', pos);
-                Golf.state.spawnPoint = { x: pos.x, y: pos.y };
-                Golf.repositionPlayers(sceneRef);
             });
         },
 
