@@ -9,7 +9,7 @@
         holeArrow: null,
         clubs: [],
         golfCarts: [],
-        currentHoleIndex: 0,
+        currentHoleIndex: 1,
         isMatchActive: false,
         isWaitingToStart: true,
         playerReady: [false, false], // [P1 ready, P2/AI ready]

@@ -39,6 +39,14 @@
                     scene.cameras.main.startFollow(Golf.state.players[index].sprite, true, 0.1, 0.1);
                     console.log('Networking: Camera attached to P' + index);
                 }
+
+                // Host: Pick First Hole and broadcast
+                if (index === 0) {
+                    if (Golf.spawnHole) {
+                        console.log('Networking: Host assigned, spawning first hole...');
+                        Golf.spawnHole(scene);
+                    }
+                }
             });
 
             socket.on('spawnPointUpdate', function (pos) {
@@ -201,6 +209,15 @@
                 // Initiate a new random hole (Host only receives this)
                 Golf.spawnHole(sceneRef);
             });
+
+            socket.on('holeSunk', function (data) {
+                console.log('Networking: Hole Sunk event received from server!', data);
+                if (Golf.syncHoleSunk) {
+                    Golf.syncHoleSunk(sceneRef, data.index);
+                } else {
+                    console.error('Networking: Golf.syncHoleSunk is NOT defined!');
+                }
+            });
         },
 
         setupUI: function () {
@@ -282,6 +299,11 @@
         requestNewHole: function () {
             if (!socket) return;
             socket.emit('requestNewHole');
+        },
+
+        sendHoleSunk: function () {
+            if (!socket) return;
+            socket.emit('holeSunk');
         },
 
         requestPickup: function (clubId) {

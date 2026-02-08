@@ -16,10 +16,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// your existing Socket.IO logic goes here...
-// e.g., io.on('connection', socket => { ... });
-
-
 // Rooms State
 // Dictionary of roomCode -> { players: {}, carts: [], started: false }
 const rooms = {};
@@ -79,22 +75,17 @@ io.on('connection', (socket) => {
             console.log(`[Server] Creating room ${code} for host ${socket.id}`);
 
             const clubs = generateFixedClubs(5000, 1500);
-            console.log(`[Server] Clubs generated: ${clubs ? clubs.length : 'NULL'}`);
-            // Verify serializability
-            try {
-                JSON.stringify(clubs);
-            } catch (jsonErr) {
-                console.error('[Server] Club data is not serializable!', jsonErr);
-            }
 
             rooms[code] = {
                 players: {},
                 carts: [],
-                // Map Config matched to client (20 cols * 250 tile = 5000, 6 rows * 250 = 1500)
                 clubs: clubs,
                 started: false,
-                spawnPoint: null
+                spawnPoint: null,
+                currentHoleIndex: 1
             };
+
+            socket.roomCode = code;
             socket.join(code);
 
             // Host is Player 0
@@ -107,13 +98,8 @@ io.on('connection', (socket) => {
             };
 
             socket.emit('roomCreated', code);
-            console.log(`[Server] Emitted roomCreated to ${socket.id}`);
-
-            socket.emit('assignPlayer', 0); // Host is P0
-            console.log(`[Server] Emitted assignPlayer to ${socket.id}`);
-
-            socket.emit('currentClubs', rooms[code].clubs); // Send clubs to host
-            console.log(`[Server] Emitted currentClubs (${rooms[code].clubs.length} items) to ${socket.id}`);
+            socket.emit('assignPlayer', 0);
+            socket.emit('currentClubs', rooms[code].clubs);
 
             console.log(`Room ${code} created by ${socket.id}`);
         } catch (err) {
@@ -131,15 +117,9 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            if (room.started) {
-                // Option: Allow spectating or mid-game join? 
-                // For now, let's treat it as standard join but they might need full state
-            }
-
+            socket.roomCode = code;
             socket.join(code);
 
-            // Assign next index (simple auto-increment for now, or find gap)
-            // Simple: 0 is host, 1 is guest.
             let assignedIndex = -1;
             const usedIndices = Object.values(room.players).map(p => p.playerIndex);
             for (let i = 0; i < 4; i++) {
@@ -155,28 +135,25 @@ io.on('connection', (socket) => {
             };
 
             socket.emit('assignPlayer', assignedIndex);
-            socket.emit('currentPlayers', room.players); // Send existing state
-
-            // Notify room
+            socket.emit('currentPlayers', room.players);
             io.to(code).emit('newPlayer', room.players[socket.id]);
-
             socket.emit('currentClubs', room.clubs.filter(c => !c.taken));
 
             console.log(`Player ${socket.id} joined room ${code}`);
 
-            // Check Start Condition (2 Players)
             if (Object.keys(room.players).length === 2 && !room.started) {
                 room.started = true;
                 io.to(code).emit('gameStart');
                 console.log(`Room ${code} Game Started`);
             }
 
-            // Sync Hole if exists
             if (room.holePosition) {
                 socket.emit('holeUpdate', room.holePosition);
             }
 
-            // Sync Spawn Point if set
+            // Sync current hole index
+            socket.emit('holeSunk', { index: room.currentHoleIndex });
+
             if (room.spawnPoint) {
                 socket.emit('spawnPointUpdate', room.spawnPoint);
             }
@@ -186,29 +163,20 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle Club Pickup Request
     socket.on('requestPickup', (clubId) => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        const code = socket.roomCode;
         if (code && rooms[code]) {
             const room = rooms[code];
             const club = room.clubs.find(c => c.id === clubId);
             if (club && !club.taken) {
                 club.taken = true;
-                // Broadcast to room so everyone removes it
-                // Tell the specific player they got it
                 io.to(code).emit('clubTaken', { clubId: clubId, playerId: socket.id });
-                // We could send a specific 'youGotClub' to the requester if needed, 
-                // but checking playerId in 'clubTaken' is sufficient.
             }
         }
     });
 
-    // Handle Player Input (scoping to room)
     socket.on('playerInput', (inputData) => {
-        // We need to know which room the socket is in. 
-        // Iterate rooms or store mapping.
-        // `socket.rooms` contains room code.
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        const code = socket.roomCode;
         if (code && rooms[code] && rooms[code].players[socket.id]) {
             const p = rooms[code].players[socket.id];
             p.x = inputData.x;
@@ -219,32 +187,30 @@ io.on('connection', (socket) => {
 
             socket.to(code).emit('playerMoved', {
                 id: socket.id,
-                playerIndex: p.playerIndex, // Send index so client knows who moved
+                playerIndex: p.playerIndex,
                 ...inputData
             });
         }
     });
 
     socket.on('cartUpdate', (cartData) => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        const code = socket.roomCode;
         if (code) {
             socket.to(code).emit('cartUpdate', cartData);
         }
     });
 
-    // Handle Hole Sync
     socket.on('holeUpdate', (pos) => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        const code = socket.roomCode;
         if (code && rooms[code]) {
-            rooms[code].holePosition = pos; // Persist for new joiners
-            socket.to(code).emit('holeUpdate', pos); // Broadcast to others
+            rooms[code].holePosition = pos;
+            socket.to(code).emit('holeUpdate', pos);
         }
     });
 
     socket.on('requestNewHole', () => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        const code = socket.roomCode;
         if (code && rooms[code]) {
-            // Forward to Host (Player 0)
             const hostId = Object.keys(rooms[code].players).find(id => rooms[code].players[id].playerIndex === 0);
             if (hostId) {
                 io.to(hostId).emit('forceSpawnHole');
@@ -252,31 +218,33 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('holeSunk', () => {
+        const code = socket.roomCode;
+        if (code && rooms[code]) {
+            const room = rooms[code];
+            room.currentHoleIndex++;
+            console.log(`[Server] Room ${code} hole sunk by ${socket.id}! Index is now ${room.currentHoleIndex}`);
+            io.to(code).emit('holeSunk', { index: room.currentHoleIndex });
+        } else {
+            console.warn(`[Server] holeSunk received from ${socket.id} but room not found! RoomCode: ${code}`);
+        }
+    });
+
     socket.on('setSpawnPoint', (pos) => {
-        const code = Array.from(socket.rooms).find(r => r !== socket.id);
+        const code = socket.roomCode;
         if (code && rooms[code]) {
             rooms[code].spawnPoint = pos;
-            console.log(`[Server] Room ${code} spawn point set to:`, pos);
             io.to(code).emit('spawnPointUpdate', pos);
         }
     });
 
     socket.on('disconnect', () => {
-        // Find room
-        let foundCode = null;
-        for (const code in rooms) {
-            if (rooms[code].players[socket.id]) {
-                delete rooms[code].players[socket.id];
-                foundCode = code;
-                break;
-            }
-        }
-
-        if (foundCode) {
-            io.to(foundCode).emit('playerDisconnected', socket.id);
-            // If room empty, delete?
-            if (Object.keys(rooms[foundCode].players).length === 0) {
-                delete rooms[foundCode];
+        const code = socket.roomCode;
+        if (code && rooms[code]) {
+            delete rooms[code].players[socket.id];
+            io.to(code).emit('playerDisconnected', socket.id);
+            if (Object.keys(rooms[code].players).length === 0) {
+                delete rooms[code];
             }
         }
     });

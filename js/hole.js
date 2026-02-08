@@ -4,7 +4,7 @@
     var CAT_HOLE = Golf.CAT_HOLE;
     var CAT_BALL = Golf.CAT_BALL;
 
-    var HOLE_RADIUS = 15;
+    var HOLE_RADIUS = 45;
 
     function createHoleArrow(scene) {
         var arrowSize = 24;
@@ -37,9 +37,8 @@
         });
 
         createHoleArrow(scene);
-        Golf.spawnHole(scene);
 
-        state.holeSensor = scene.matter.add.circle(state.hole.x, state.hole.y, HOLE_RADIUS, {
+        state.holeSensor = scene.matter.add.circle(0, 0, HOLE_RADIUS, {
             isStatic: true,
             isSensor: true,
             label: 'hole',
@@ -49,78 +48,94 @@
             }
         });
 
+        // Now that sensor exists, spawn it at the right place
+        Golf.spawnHole(scene);
+
         scene.sinkCooldownFrames = 0;
         scene.matter.world.on('collisionactive', function (event) {
-            if (!state.isMatchActive || scene.sinkCooldownFrames > 0) return;
+            if (scene.sinkCooldownFrames > 0) return;
+
             for (var i = 0; i < event.pairs.length; i++) {
                 var pair = event.pairs[i];
                 var a = pair.bodyA;
                 var b = pair.bodyB;
+
                 var holeBody = a.label === 'hole' ? a : b.label === 'hole' ? b : null;
                 var ballBody = a.label === 'ball' ? a : b.label === 'ball' ? b : null;
-                if (!holeBody || !ballBody) continue;
-                var ballSpeed = Math.sqrt(ballBody.velocity.x * ballBody.velocity.x + ballBody.velocity.y * ballBody.velocity.y);
-                if (ballSpeed > 6) continue;
 
-                var player = state.players.find(function (p) { return p.ball === ballBody; });
-                if (player && player.ballHeight < 5) {
-                    scene.sinkCooldownFrames = 90;
-                    Golf.onBallSunk(scene, player);
+                if (holeBody && ballBody) {
+                    if (!state.isMatchActive) {
+                        // Suppress logs unless explicitly practicing, maybe add a hint
+                        continue;
+                    }
+
+                    var bSpeed = Math.sqrt(ballBody.velocity.x * ballBody.velocity.x + ballBody.velocity.y * ballBody.velocity.y);
+                    if (bSpeed > 10) continue;
+
+                    var player = state.players.find(function (p) { return p.ball === ballBody; });
+                    if (player && player.ballHeight < 5) {
+                        // Debounce by checking if we already started sinking for this specific hole index
+                        if (scene.lastSunkIndex === state.currentHoleIndex) return;
+                        scene.lastSunkIndex = state.currentHoleIndex;
+
+                        console.log("BALL SUNK! P" + player.playerIndex + " putted hole #" + state.currentHoleIndex);
+                        scene.sinkCooldownFrames = 90;
+                        Golf.onBallSunk(scene, player);
+                    }
+                    break;
                 }
-                break;
             }
         });
     };
 
     Golf.spawnHole = function (scene, forceX, forceY) {
-        // If coordinates provided (from Server), use them directly
-        if (forceX !== undefined && forceY !== undefined) {
-            state.hole.setPosition(forceX, forceY);
-            if (state.holeSensor) {
-                scene.matter.body.setPosition(state.holeSensor, { x: forceX, y: forceY });
-            }
-            console.log("Hole synced to: " + forceX + ", " + forceY);
-            Golf.updateHoleArrow(scene);
-            return;
-        }
-
-        // Host-Authoritative Logic:
-        // Only Host (myPlayerId === 0) or Singleplayer (myPlayerId === null) generates holes.
-        // Guests do nothing but wait for 'holeUpdate'.
-        var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
-
-        if (!isHost) {
-            console.log("Guest: Waiting for hole update from Host...");
-            return;
-        }
-
         // Use predetermined hole positions from the map
         if (!state.holePositions || state.holePositions.length === 0) {
-            console.warn('No hole positions defined in map!');
+            console.warn('Map data not ready yet, retrying spawnHole in 100ms...');
+            setTimeout(function () {
+                Golf.spawnHole(scene, forceX, forceY);
+            }, 100);
             return;
         }
 
-        // Select a random hole position
-        var randomIndex = Phaser.Math.Between(0, state.holePositions.length - 1);
-        var holePos = state.holePositions[randomIndex];
+        var hx, hy;
 
-        var hx = holePos.x;
-        var hy = holePos.y;
+        // If coordinates provided (from Server), use them directly
+        if (forceX !== undefined && forceY !== undefined) {
+            hx = forceX;
+            hy = forceY;
+            console.log("Hole Sync (Forced): " + hx + ", " + hy);
+        } else {
+            // Host-Authoritative Logic:
+            // Only Host (myPlayerId === 0) or Singleplayer (myPlayerId === null) generates holes.
+            // Guests do nothing but wait for 'holeUpdate'.
+            var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+            if (!isHost) {
+                console.log("Guest: Waiting for hole update from Host...");
+                return;
+            }
+
+            // Select a random hole position
+            var randomIndex = Phaser.Math.Between(0, state.holePositions.length - 1);
+            var holePos = state.holePositions[randomIndex];
+            hx = holePos.x;
+            hy = holePos.y;
+            console.log("Hole Spawn (New Random): " + hx + ", " + hy + " (idx: " + randomIndex + ")");
+
+            // Broadcast new position if Multiplayer
+            if (Golf.Networking && Golf.Networking.sendHoleUpdate && state.myPlayerId !== null) {
+                Golf.Networking.sendHoleUpdate(hx, hy);
+            }
+        }
 
         state.hole.setPosition(hx, hy);
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
-        console.log("Hole spawned at predetermined position " + (randomIndex + 1) + ": " + hx + ", " + hy);
 
         // Update UI if available
         if (scene.holeDisplay) {
-            scene.holeDisplay.textContent = 'Hole: ' + (randomIndex + 1);
-        }
-
-        // Broadcast new position if Multiplayer
-        if (Golf.Networking && Golf.Networking.sendHoleUpdate && state.myPlayerId !== null) {
-            Golf.Networking.sendHoleUpdate(hx, hy);
+            scene.holeDisplay.textContent = 'Hole: ' + state.currentHoleIndex;
         }
 
         Golf.updateHoleArrow(scene);
@@ -140,28 +155,51 @@
         state.holeArrow.setVisible(dist > 80);
     };
 
+    Golf.syncHoleSunk = function (scene, newIndex) {
+        console.log("Golf.syncHoleSunk called! New Index:", newIndex, "Current:", state.currentHoleIndex);
+
+        state.currentHoleIndex = newIndex;
+        if (scene.holeDisplay) {
+            scene.holeDisplay.innerText = 'Hole: ' + state.currentHoleIndex;
+        }
+
+        // Green flash and camera shake for success
+        scene.cameras.main.flash(500, 0, 255, 0);
+        scene.cameras.main.shake(200, 0.005);
+
+        if (state.currentHoleIndex > 10) {
+            console.log("Match Complete! 10 holes reached.");
+            setTimeout(function () {
+                alert('ROUND OVER! 10 holes completed!');
+                window.location.reload();
+            }, 1000);
+        } else {
+            // When a hole is sunk, the host picks the next one.
+            var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
+            if (isHost) {
+                console.log("Host: Spawning next hole for current index " + state.currentHoleIndex);
+                Golf.spawnHole(scene);
+            } else {
+                console.log("Guest: Waiting for holeUpdate from Host...");
+            }
+        }
+    };
+
     Golf.onBallSunk = function (scene, p) {
         if (p.isAI) {
             Golf.spawnHole(scene);
             return;
         }
-        state.currentHoleIndex++;
-        scene.holeDisplay.innerText = state.currentHoleIndex;
-        scene.cameras.main.flash(500, 0, 255, 0);
-        if (state.currentHoleIndex >= 10) {
-            alert('ROUND OVER! You finished 10 holes!');
-            window.location.reload();
+
+        console.log("Golf.onBallSunk triggered for P" + p.playerIndex);
+
+        // Multiplayer: Tell server someone sunk it.
+        if (Golf.Networking && Golf.Networking.sendHoleSunk && state.myPlayerId !== null) {
+            console.log("Multiplayer: Sending holeSunk to server...");
+            Golf.Networking.sendHoleSunk();
         } else {
-            // Updated Hole Generation Logic:
-            var isHost = (state.myPlayerId === 0 || state.myPlayerId === null);
-            if (isHost) {
-                Golf.spawnHole(scene);
-            } else {
-                // Request Host to spawn new hole
-                if (Golf.Networking && Golf.Networking.requestNewHole) {
-                    Golf.Networking.requestNewHole();
-                }
-            }
+            console.log("Singleplayer: Advancing hole locally...");
+            Golf.syncHoleSunk(scene, state.currentHoleIndex + 1);
         }
     };
 })(typeof window !== 'undefined' ? window : this);
