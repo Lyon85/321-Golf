@@ -31,48 +31,62 @@
                 var x = c * config.tileSize + config.tileSize / 2;
                 var y = r * config.tileSize + config.tileSize / 2;
 
-                // Parse Modifier Format: g1[t,h]
+                // Parse Modifier Format: g1[h], g2[t], g3[i90] (terrain + optional [modifiers])
                 var match = rawToken.match(/^([a-zA-Z0-9]+)(?:\[(.*?)\])?$/);
-                var token = match ? match[1] : rawToken; // Base token
+                var token = match ? match[1] : rawToken; // Base terrain token (w1, g2, etc.)
                 var modifiers = match && match[2] ? match[2].split(',') : [];
 
-                var tileInfo = { type: 'grass', angle: null, depth: null, token: rawToken, isTee: false };
+                var tileInfo = { type: 'grass', angle: null, depth: null, token: rawToken, baseToken: token, isTee: false };
 
-                // Handle Modifiers
-                if (modifiers.includes('t') || token === 't') {
+                // Modifier: [t] = tee spawn
+                if (modifiers.indexOf('t') !== -1 || token === 't') {
                     tileInfo.isTee = true;
                     state.teePositions.push({ x: x, y: y });
                 }
 
-                if (modifiers.includes('h') || token === 'h') {
-                    // Hole modifier logic if needed, or stick to holePositions array
-                    // For now, let's keep existing logic but adapt strict token checks
-                }
-
-                // Base Type Logic
-                if (token.startsWith('w')) {
-                    tileInfo.type = 'water';
-                    // Water sensor (keep these permanent as they are light and needed for physics)
-                    scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
-                        isStatic: true, isSensor: true, label: 'water',
-                        collisionFilter: { category: CAT_TERRAIN }
-                    });
-                } else if (token.startsWith('g')) {
-                    tileInfo.type = 'grass';
-                } else if (token === 'r') {
-                    tileInfo.type = 'rough';
-                } else if (token === 'b') {
-                    tileInfo.type = 'sand';
-                } else if (token === 't') {
-                    // Legacy 't' as base type -> treat as grass but already marked isTee
-                    tileInfo.type = 'grass';
-                } else if (token === 'h') {
+                // Modifier: [h] = hole spawn
+                if (modifiers.indexOf('h') !== -1 || token === 'h') {
                     tileInfo.type = 'hole_position';
                     if (!state.holePositions) state.holePositions = [];
                     state.holePositions.push({ x: x, y: y, row: r, col: c });
-                } else if (token.startsWith('i')) {
+                }
+
+                // Modifier: [i90] = incline angle in degrees
+                var inclineMod = null;
+                for (var m = 0; m < modifiers.length; m++) {
+                    var im = modifiers[m].match(/^i(-?\d+)$/);
+                    if (im) { inclineMod = parseInt(im[1], 10); break; }
+                }
+
+                // Base Type Logic (terrain only; modifiers already set hole/tee)
+                if (!tileInfo.type || tileInfo.type === 'grass') {
+                    if (token.startsWith('w')) {
+                        tileInfo.type = 'water';
+                        scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
+                            isStatic: true, isSensor: true, label: 'water',
+                            collisionFilter: { category: CAT_TERRAIN }
+                        });
+                    } else if (token.startsWith('g')) {
+                        tileInfo.type = 'grass';
+                    } else if (token === 'r') {
+                        tileInfo.type = 'rough';
+                    } else if (token === 'b') {
+                        tileInfo.type = 'sand';
+                    } else if (token === 't') {
+                        tileInfo.type = 'grass';
+                    } else if (token === 'h') {
+                        tileInfo.type = 'hole_position';
+                        if (!state.holePositions) state.holePositions = [];
+                        state.holePositions.push({ x: x, y: y, row: r, col: c });
+                    } else if (token.startsWith('i') && !inclineMod) {
+                        tileInfo.type = 'incline';
+                        tileInfo.angle = parseInt(token.substring(1), 10);
+                    }
+                }
+
+                if (inclineMod !== null) {
                     tileInfo.type = 'incline';
-                    tileInfo.angle = parseInt(token.substring(1));
+                    tileInfo.angle = inclineMod;
                 }
 
                 state.mapGrid[r][c] = tileInfo;
@@ -166,27 +180,29 @@
                 var x = c * config.tileSize + config.tileSize / 2;
                 var y = r * config.tileSize + config.tileSize / 2;
 
-                // Configure base rectangle
+                // Configure base rectangle (use baseToken for color so g3[i90] colors as g3)
                 var color = 0x2ecc71; // Default Grass
-                var token = tile.token;
+                var baseToken = tile.baseToken != null ? tile.baseToken : tile.token;
 
-                if (token.startsWith('w')) {
-                    if (token === 'w1') color = 0x5dade2;
-                    else if (token === 'w2') color = 0x3498db;
-                    else if (token === 'w3') color = 0x2874a6;
+                if (baseToken.startsWith('w')) {
+                    if (baseToken === 'w1') color = 0x5dade2;
+                    else if (baseToken === 'w2') color = 0x3498db;
+                    else if (baseToken === 'w3') color = 0x2874a6;
                     else color = 0x3498db;
-                } else if (token === 'g2') {
+                } else if (baseToken === 'g2') {
                     color = 0x27ae60;
-                } else if (token === 'r') {
+                } else if (baseToken === 'r') {
                     color = 0x27ae60;
-                } else if (token === 'b') {
+                } else if (baseToken === 'b') {
                     color = 0xf1c40f;
-                } else if (token.startsWith('i')) {
+                } else if (baseToken.startsWith('g')) {
+                    color = 0x2ecc71;
+                } else if (baseToken.startsWith('i') || tile.type === 'incline') {
                     color = 0x8bc34a;
                 }
 
                 poolObj.rect.setPosition(x, y).setFillStyle(color).setVisible(true);
-                poolObj.label.setPosition(x, y).setText(token).setVisible(true);
+                poolObj.label.setPosition(x, y).setText(tile.token).setVisible(true);
 
                 if (tile.type === 'incline' && tile.angle !== null) {
                     poolObj.arrow.setPosition(x, y).setAngle(tile.angle).setVisible(true);
