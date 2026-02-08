@@ -111,7 +111,7 @@
             p.turboRamp = Math.max(0, p.turboRamp - 0.002 * dt);
         }
 
-        var baseMax = 4 * terrainSpeedMult;
+        var baseMax = 7 * terrainSpeedMult;
         var turboBoost = 3.0 * terrainSpeedMult;
         var currentMax = baseMax + turboBoost * p.turboRamp;
 

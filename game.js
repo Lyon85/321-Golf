@@ -1,10 +1,33 @@
 // 321 Golf - Chaotic Town Edition
 const config = {
-    type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight,
+    type: Phaser.AUTO,
+    width: window.innerWidth,
+    height: window.innerHeight,
     parent: 'game-container',
-    physics: { default: 'matter', matter: { gravity: { y: 0 }, debug: false } },
-    scene: { preload: preload, create: create, update: update }
+
+    fps: {
+        target: 60,
+        forceSetTimeOut: true
+    },
+
+    physics: {
+        default: 'matter',
+        matter: {
+            gravity: { y: 0 },
+            debug: false,
+            timing: {
+                fixedDelta: 1000 / 60
+            }
+        }
+    },
+
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
 };
+
 
 const game = new Phaser.Game(config);
 let players = [], hole, holeSensor, holeArrow, clubs = [], golfCarts = [], currentHoleIndex = 0, isMatchActive = false, isWaitingToStart = true, aimLine, hitConeGraphics, particles;

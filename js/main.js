@@ -439,12 +439,30 @@
         width: window.innerWidth,
         height: window.innerHeight,
         parent: 'game-container',
+
+        fps: {
+            target: 60,
+            forceSetTimeOut: true
+        },
+
         physics: {
             default: 'matter',
-            matter: { gravity: { y: 0 }, debug: false }
+            matter: {
+                gravity: { y: 0 },
+                debug: false,
+                timing: {
+                    fixedDelta: 1000 / 60
+                }
+            }
         },
-        scene: { preload: preload, create: create, update: update }
+
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
     };
+
 
     new Phaser.Game(config);
 })(typeof window !== 'undefined' ? window : this);

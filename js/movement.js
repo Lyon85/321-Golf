@@ -1,7 +1,13 @@
 (function (global) {
     var Golf = global.Golf;
 
-    Golf.handlePlayerMovement = function (scene, p, overrideKeys, delta) {
+    /**
+     * Handles player movement using Matter.js.
+     * NOTE:
+     * Matter.js runs on a fixed timestep, so velocity must NOT be delta-scaled.
+     * Velocity values are applied per physics step and are refresh-rate independent.
+     */
+    Golf.handlePlayerMovement = function (scene, p, overrideKeys) {
         var keys = overrideKeys || {
             W: scene.keys.W.isDown,
             A: scene.keys.A.isDown,
@@ -9,13 +15,8 @@
             D: scene.keys.D.isDown
         };
 
-        // Normalize speed based on 60 FPS (16.666ms per frame)
-        var dt = delta || 16.666;
-        if (dt > 100) dt = 100; // Cap large deltas to prevent teleporting on lag spikes
-        if (dt < 8) dt = 16.666; // Avoid tiny/zero delta (e.g. first frame) so we don't get zero velocity for a frame
-        var speedScale = dt / 16.666;
-
-        var speedCap = 3 * speedScale;
+        // Base movement speed (physics units per step)
+        var speedCap = 4;
 
         if (p.isAiming) {
             speedCap *= 0.35;
@@ -25,7 +26,7 @@
 
         var anyMove = keys.W || keys.S || keys.A || keys.D;
 
-        // State + direction handling (unchanged logic)
+        // State + direction handling
         if (anyMove) {
             p.state = Golf.PLAYER_STATES.WALKING;
 
@@ -44,15 +45,19 @@
         // If aiming and not moving, stop completely
         if (p.isAiming && !anyMove) {
             scene.matter.body.setVelocity(p.body, { x: 0, y: 0 });
-            p.body.frictionAir = (p.body.baseFrictionAir !== undefined) ? p.body.baseFrictionAir : 0.01;
+            p.body.frictionAir = (p.body.baseFrictionAir !== undefined)
+                ? p.body.baseFrictionAir
+                : 0.01;
             return;
         }
 
-        // Zero air friction while moving so setVelocity isn't damped (no ramp-up)
+        // Disable air friction while moving so setVelocity is not damped
         if (anyMove) {
             p.body.frictionAir = 0;
         } else {
-            p.body.frictionAir = (p.body.baseFrictionAir !== undefined) ? p.body.baseFrictionAir : 0.01;
+            p.body.frictionAir = (p.body.baseFrictionAir !== undefined)
+                ? p.body.baseFrictionAir
+                : 0.01;
         }
 
         // Build movement vector
@@ -66,10 +71,11 @@
             moveY /= len;
         }
 
-        // Apply velocity directly (FPS independent)
+        // Apply velocity directly (refresh-rate independent)
         scene.matter.body.setVelocity(p.body, {
             x: moveX * speedCap,
             y: moveY * speedCap
         });
     };
+
 })(typeof window !== 'undefined' ? window : this);
