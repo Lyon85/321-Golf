@@ -12,6 +12,7 @@
         // Normalize speed based on 60 FPS (16.666ms per frame)
         var dt = delta || 16.666;
         if (dt > 100) dt = 100; // Cap large deltas to prevent teleporting on lag spikes
+        if (dt < 8) dt = 16.666; // Avoid tiny/zero delta (e.g. first frame) so we don't get zero velocity for a frame
         var speedScale = dt / 16.666;
 
         var speedCap = 3 * speedScale;
@@ -43,7 +44,15 @@
         // If aiming and not moving, stop completely
         if (p.isAiming && !anyMove) {
             scene.matter.body.setVelocity(p.body, { x: 0, y: 0 });
+            p.body.frictionAir = (p.body.baseFrictionAir !== undefined) ? p.body.baseFrictionAir : 0.01;
             return;
+        }
+
+        // Zero air friction while moving so setVelocity isn't damped (no ramp-up)
+        if (anyMove) {
+            p.body.frictionAir = 0;
+        } else {
+            p.body.frictionAir = (p.body.baseFrictionAir !== undefined) ? p.body.baseFrictionAir : 0.01;
         }
 
         // Build movement vector
