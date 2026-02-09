@@ -61,17 +61,31 @@
                 // Base Type Logic (terrain only; modifiers already set hole/tee)
                 if (!tileInfo.type || tileInfo.type === 'grass') {
                     if (token.startsWith('w')) {
-                        tileInfo.type = 'water';
+                        tileInfo.type = token === 'w1' ? 'water1' : (token === 'w2' ? 'water2' : (token === 'w3' ? 'water3' : 'water'));
+
+                        // Always a sensor for terrain effects (swimming, slowing)
                         scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
-                            isStatic: true, isSensor: true, label: 'water',
+                            isStatic: true, isSensor: true, label: tileInfo.type,
                             collisionFilter: { category: CAT_TERRAIN }
                         });
+
+                        // Solid blocker for buggies in w2/w3
+                        if (token === 'w2' || token === 'w3') {
+                            scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
+                                isStatic: true, label: tileInfo.type + '_solid',
+                                collisionFilter: { category: Golf.CAT_DEEP_WATER }
+                            });
+                        }
                     } else if (token.startsWith('g')) {
                         tileInfo.type = 'grass';
                     } else if (token === 'r') {
                         tileInfo.type = 'rough';
-                    } else if (token === 'b') {
-                        tileInfo.type = 'sand';
+                    } else if (token === 'm') {
+                        tileInfo.type = 'mountain';
+                        scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
+                            isStatic: true, label: 'mountain',
+                            collisionFilter: { category: CAT_TERRAIN }
+                        });
                     } else if (token === 't') {
                         tileInfo.type = 'grass';
                     } else if (token === 'h') {
@@ -195,6 +209,8 @@
                     color = 0x27ae60;
                 } else if (baseToken === 'b') {
                     color = 0xf1c40f;
+                } else if (baseToken.startsWith('m')) {
+                    color = 0x7f8c8d;
                 } else if (baseToken.startsWith('g')) {
                     color = 0x2ecc71;
                 } else if (baseToken.startsWith('i') || tile.type === 'incline') {
@@ -338,7 +354,7 @@
                 var bodyA = pair.bodyA;
                 var bodyB = pair.bodyB;
 
-                var terrainBody = bodyA.label === 'water' ? bodyA : (bodyB.label === 'water' ? bodyB : null);
+                var terrainBody = bodyA.label.startsWith('water') ? bodyA : (bodyB.label.startsWith('water') ? bodyB : null);
                 var otherBody = terrainBody === bodyA ? bodyB : bodyA;
 
                 if (terrainBody && (otherBody.label === 'player' || otherBody.label === 'ball')) {
@@ -352,7 +368,7 @@
                 var bodyA = pair.bodyA;
                 var bodyB = pair.bodyB;
 
-                var terrainBody = bodyA.label === 'water' ? bodyA : (bodyB.label === 'water' ? bodyB : null);
+                var terrainBody = bodyA.label.startsWith('water') ? bodyA : (bodyB.label.startsWith('water') ? bodyB : null);
                 var otherBody = terrainBody === bodyA ? bodyB : bodyA;
 
                 if (terrainBody && (otherBody.label === 'player' || otherBody.label === 'ball')) {
@@ -373,11 +389,15 @@
                 body.baseFrictionAir = body.frictionAir;
             }
 
-            if (terrainLabel === 'water' && player && player.ballHeight < 1) {
+            if (terrainLabel.startsWith('water') && player && player.ballHeight < 1) {
                 handleWaterHazard(scene, body);
             }
-        } else if (body.label === 'player' && terrainLabel === 'water' && player) {
-            player.state = Golf.PLAYER_STATES.SWIMMING;
+        } else if (body.label === 'player' && terrainLabel.startsWith('water') && player) {
+            if (terrainLabel === 'water2' || terrainLabel === 'water3' || terrainLabel === 'water') {
+                player.state = Golf.PLAYER_STATES.SWIMMING;
+            } else if (terrainLabel === 'water1') {
+                body.currentTerrainType = TERRAIN_TYPES.WATER1;
+            }
         }
     }
 

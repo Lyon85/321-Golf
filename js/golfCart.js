@@ -18,7 +18,7 @@
             height: 20,
             collisionFilter: {
                 category: CAT_CAR,
-                mask: CAT_BUILDING | CAT_PLAYER | CAT_BALL | CAT_DEFAULT | CAT_CAR | Golf.CAT_TERRAIN
+                mask: CAT_BUILDING | CAT_PLAYER | CAT_BALL | CAT_DEFAULT | CAT_CAR | Golf.CAT_TERRAIN | Golf.CAT_DEEP_WATER
             }
         });
 

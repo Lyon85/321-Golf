@@ -24,6 +24,11 @@
             speedCap *= 0.6;
         }
 
+        // Apply terrain slowing (e.g. wading in w1)
+        if (p.body.currentTerrainType && p.body.currentTerrainType.playerSpeedMult) {
+            speedCap *= p.body.currentTerrainType.playerSpeedMult;
+        }
+
         var anyMove = keys.W || keys.S || keys.A || keys.D;
 
         // State + direction handling
