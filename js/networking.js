@@ -53,9 +53,10 @@
                 console.log('Networking: Received Spawn Point Update:', pos);
                 Golf.state.spawnPoint = pos;
 
+                var offsets = [0, 100, -100]; // Defined in main.js creation
+
                 // Teleport existing players if they exist
                 if (Golf.state.players && Golf.state.players.length > 0) {
-                    var offsets = [0, 100, -100]; // Defined in main.js creation
                     Golf.state.players.forEach(function (p, i) {
                         var offX = offsets[i] !== undefined ? offsets[i] : 0;
                         var newX = pos.x + offX;
@@ -67,6 +68,17 @@
                             scene.matter.body.setPosition(p.ball, { x: newX + 60, y: newY });
                             p.ballSprite.setPosition(newX + 60, newY);
                         }
+                    });
+                }
+
+                // Teleport existing golf carts
+                if (Golf.state.golfCarts && Golf.state.golfCarts.length > 0) {
+                    Golf.state.golfCarts.forEach(function (cart, i) {
+                        var offX = offsets[i] !== undefined ? offsets[i] : 0;
+                        var newX = pos.x + offX + 60; // Offset cart from player
+                        var newY = pos.y;
+                        scene.matter.body.setPosition(cart.body, { x: newX, y: newY });
+                        cart.sprite.setPosition(newX, newY);
                     });
                 }
             });

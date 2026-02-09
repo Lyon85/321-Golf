@@ -108,6 +108,13 @@
         state.aimLine = scene.add.graphics().setDepth(10);
         state.hitConeGraphics = scene.add.graphics().setDepth(9);
 
+        // Pick a random tee if not already set (e.g. by networking or host)
+        if (!state.spawnPoint && state.teePositions && state.teePositions.length > 0) {
+            var randomIndex = Phaser.Math.Between(0, state.teePositions.length - 1);
+            state.spawnPoint = state.teePositions[randomIndex];
+            console.log('[Main] Selected initial random tee:', state.spawnPoint);
+        }
+
         var spawnX = state.spawnPoint ? state.spawnPoint.x : worldWidth / 2;
         var spawnY = state.spawnPoint ? state.spawnPoint.y : worldHeight / 2;
 
