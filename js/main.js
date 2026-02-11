@@ -5,7 +5,7 @@
 
     function preload() {
         console.log('Phaser: Preloading assets...');
-        this.load.spritesheet('player-sheet', Golf.ASSETS.PLAYER_SPRITESHEET, { frameWidth: 16, frameHeight: 16 });
+        this.load.spritesheet('player-sheet', Golf.ASSETS.PLAYER_SPRITESHEET, { frameWidth: 160, frameHeight: 160 });
     }
 
     function create() {
