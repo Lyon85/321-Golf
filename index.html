@@ -60,22 +60,33 @@
             <div id="speed-unit">KM/H</div>
         </div>
     </div>
-    <script src="js/constants.js?v3.2.1"></script>
-    <script src="js/map.js?v3.2.1"></script>
-    <script src="js/assets.js?v3.2.1"></script>
-    <script src="js/state.js?v3.2.1"></script>
-    <script src="js/player.js?v3.2.1"></script>
-    <script src="js/clubs.js?v3.2.1"></script>
-    <script src="js/hole.js?v3.2.1"></script>
-    <script src="js/countdown.js?v3.2.1"></script>
-    <script src="js/golfCart.js?v3.2.1"></script>
-    <script src="js/movement.js?v3.2.1"></script>
-    <script src="js/aiming.js?v3.2.1"></script>
-    <script src="js/ai.js?v3.2.1"></script>
-    <script src="js/town.js?v3.2.1"></script>
-    <script src="js/terrain.js?v3.2.1"></script>
-    <script src="js/networking.js?v3.2.1"></script>
-    <script src="js/main.js?v3.2.1"></script>
+    <script>
+        const scripts = [
+            "js/constants.js",
+            "js/map.js",
+            "js/assets.js",
+            "js/state.js",
+            "js/player.js",
+            "js/clubs.js",
+            "js/hole.js",
+            "js/countdown.js",
+            "js/golfCart.js",
+            "js/movement.js",
+            "js/aiming.js",
+            "js/ai.js",
+            "js/town.js",
+            "js/terrain.js",
+            "js/networking.js",
+            "js/main.js"
+        ];
+
+        scripts.forEach(src => {
+            const s = document.createElement('script');
+            s.src = src + '?t=' + Date.now(); // unique query string
+            document.head.appendChild(s);
+        });
+    </script>
+
 </body>
 
 </html>

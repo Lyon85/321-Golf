@@ -91,10 +91,14 @@
     Golf.spawnHole = function (scene, forceX, forceY) {
         // Use predetermined hole positions from the map
         if (!state.holePositions || state.holePositions.length === 0) {
-            console.warn('Map data not ready yet, retrying spawnHole in 100ms...');
+            var now = Date.now();
+            if (!Golf._lastHoleRetryLog || now - Golf._lastHoleRetryLog > 5000) {
+                console.warn('Map data not ready yet for hole spawning, retrying...');
+                Golf._lastHoleRetryLog = now;
+            }
             setTimeout(function () {
                 Golf.spawnHole(scene, forceX, forceY);
-            }, 100);
+            }, 500);
             return;
         }
 

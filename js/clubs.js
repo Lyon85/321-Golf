@@ -9,6 +9,14 @@
         var worldHeight = config.rows * config.tileSize;
         var margin = 50;
 
+        if (!state.mapGrid || state.mapGrid.length === 0) {
+            console.warn('[Clubs] Map grid not ready yet, retrying spawnClubs in 500ms...');
+            scene.time.delayedCall(500, function () {
+                Golf.spawnClubs(scene, data);
+            });
+            return;
+        }
+
         // Clear existing clubs if any
         if (state.clubs.length > 0) {
             console.log(`[Clubs] Clearing ${state.clubs.length} existing clubs.`);
@@ -47,11 +55,23 @@
 
             // Single-player Mode: Generate Random
             var types = Object.keys(CLUB_TYPES);
+            var playableTypes = ['grass', 'rough', 'sand', 'incline'];
+
             for (var i = 0; i < 120; i++) {
                 var typeKey = types[Phaser.Math.Between(0, types.length - 1)];
                 var type = CLUB_TYPES[typeKey];
-                var x = Phaser.Math.Between(margin, worldWidth - margin);
-                var y = Phaser.Math.Between(margin, worldHeight - margin);
+
+                var x, y, isValid = false, attempts = 0;
+                while (!isValid && attempts < 20) {
+                    x = Phaser.Math.Between(margin, worldWidth - margin);
+                    y = Phaser.Math.Between(margin, worldHeight - margin);
+
+                    var tile = Golf.getTileAt(x, y);
+                    if (tile && playableTypes.includes(tile.type)) {
+                        isValid = true;
+                    }
+                    attempts++;
+                }
 
                 createClub(scene, x, y, type);
 

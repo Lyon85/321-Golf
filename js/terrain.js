@@ -6,12 +6,21 @@
     var CAT_BALL = Golf.CAT_BALL;
     var TERRAIN_TYPES = Golf.TERRAIN_TYPES;
 
+
     /**
      * Parses the manual map data and creates sensors.
      */
     Golf.loadMap = function (scene) {
         var config = Golf.MAP_CONFIG;
-        var tokens = Golf.MAP_DATA.replace(/\s+/g, '').split(',');
+        if (typeof Golf.MAP_DATA !== 'string' || Golf.MAP_DATA.length === 0) {
+            console.warn('[Terrain] MAP_DATA not ready. Retrying parse in 500ms...');
+            scene.time.delayedCall(500, function () {
+                Golf.loadMap(scene);
+            });
+            return;
+        }
+        // Split by comma BUT only if not inside brackets
+        var tokens = Golf.MAP_DATA.replace(/\s+/g, '').split(/,(?![^\[]*\])/);
 
         state.mapGrid = [];
         state.spawnPoint = { x: config.tileSize / 2, y: config.tileSize / 2 };
@@ -36,27 +45,32 @@
                 var token = match ? match[1] : rawToken; // Base terrain token (w1, g2, etc.)
                 var modifiers = match && match[2] ? match[2].split(',') : [];
 
-                var tileInfo = { type: 'grass', angle: null, depth: null, token: rawToken, baseToken: token, isTee: false };
-
-                // Modifier: [t] = tee spawn
-                if (modifiers.indexOf('t') !== -1 || token === 't') {
-                    tileInfo.isTee = true;
-                    state.teePositions.push({ x: x, y: y });
-                }
-
-                // Modifier: [h] = hole spawn
-                if (modifiers.indexOf('h') !== -1 || token === 'h') {
-                    tileInfo.type = 'hole_position';
-                    if (!state.holePositions) state.holePositions = [];
-                    state.holePositions.push({ x: x, y: y, row: r, col: c });
-                }
-
-                // Modifier: [i90] = incline angle in degrees
+                // Parser for incline (i) and direction (d) modifiers
                 var inclineMod = null;
+                var directionMod = null;
+
                 for (var m = 0; m < modifiers.length; m++) {
-                    var im = modifiers[m].match(/^i(-?\d+)$/);
-                    if (im) { inclineMod = parseInt(im[1], 10); break; }
+                    var mStr = modifiers[m];
+                    var im = mStr.match(/^i(-?\d+)$/);
+                    if (im) {
+                        inclineMod = parseInt(im[1], 10);
+                        continue;
+                    }
+                    var dm = mStr.match(/^d(-?\d+)$/);
+                    if (dm) {
+                        directionMod = parseInt(dm[1], 10);
+                        continue;
+                    }
                 }
+
+                var tileInfo = {
+                    type: 'grass',
+                    direction: directionMod,
+                    incline: (inclineMod !== null) ? inclineMod : 0,
+                    token: rawToken,
+                    baseToken: token,
+                    isTee: false
+                };
 
                 // Base Type Logic (terrain only; modifiers already set hole/tee)
                 if (!tileInfo.type || tileInfo.type === 'grass') {
@@ -80,10 +94,10 @@
                         tileInfo.type = 'grass';
                     } else if (token === 'r') {
                         tileInfo.type = 'rough';
-                    } else if (token === 'm') {
+                    } else if (token.startsWith('m')) {
                         tileInfo.type = 'mountain';
                         scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
-                            isStatic: true, label: 'mountain',
+                            isStatic: true, isSensor: true, label: 'mountain',
                             collisionFilter: { category: CAT_TERRAIN }
                         });
                     } else if (token === 't') {
@@ -98,9 +112,31 @@
                     }
                 }
 
-                if (inclineMod !== null) {
+                // Modifier: [t] = tee spawn
+                if (modifiers.indexOf('t') !== -1 || token === 't') {
+                    tileInfo.isTee = true;
+                    state.teePositions.push({ x: x, y: y });
+                }
+
+                // Modifier: [h] = hole spawn
+                if (modifiers.indexOf('h') !== -1 || token === 'h') {
+                    tileInfo.type = 'hole_position';
+                    if (!state.holePositions) state.holePositions = [];
+                    state.holePositions.push({ x: x, y: y, row: r, col: c });
+                }
+
+                if (directionMod !== null) {
                     tileInfo.type = 'incline';
-                    tileInfo.angle = inclineMod;
+                    tileInfo.direction = directionMod;
+                } else if (inclineMod !== null) {
+                    // Backward compatibility: [i90] without [dXX] sets direction (old behavior)
+                    tileInfo.type = 'incline';
+                    tileInfo.direction = inclineMod;
+                    tileInfo.incline = 5; // Default some incline if only angle given
+                } else if (token.startsWith('i')) {
+                    tileInfo.type = 'incline';
+                    tileInfo.direction = parseInt(token.substring(1), 10);
+                    tileInfo.incline = 5;
                 }
 
                 state.mapGrid[r][c] = tileInfo;
@@ -114,14 +150,14 @@
     Golf.initTilePool = function (scene) {
         var config = Golf.MAP_CONFIG;
         // Calculate max tiles visible on screen plus a buffer
-        var maxTilesX = Math.ceil(scene.cameras.main.width / config.tileSize) + 2;
-        var maxTilesY = Math.ceil(scene.cameras.main.height / config.tileSize) + 2;
+        var maxTilesX = Math.ceil(scene.cameras.main.width / config.tileSize) + 10;
+        var maxTilesY = Math.ceil(scene.cameras.main.height / config.tileSize) + 10;
         var poolSize = maxTilesX * maxTilesY;
 
         state.tilePool = [];
         for (var i = 0; i < poolSize; i++) {
             var rect = scene.add.rectangle(0, 0, config.tileSize, config.tileSize, 0xffffff)
-                .setStrokeStyle(2, 0x000000, 0.3)
+                .setStrokeStyle(0, 0x000000, 0.3)
                 .setDepth(-11)
                 .setVisible(false);
 
@@ -203,26 +239,54 @@
                     else if (baseToken === 'w2') color = 0x3498db;
                     else if (baseToken === 'w3') color = 0x2874a6;
                     else color = 0x3498db;
-                } else if (baseToken === 'g2') {
-                    color = 0x27ae60;
+                } else if (baseToken.startsWith('g')) {
+                    if (baseToken === 'g1') color = 0x6BD99A;
+                    else if (baseToken === 'g2') color = 0x2ECC71;
+                    else if (baseToken === 'g3') color = 0x15964B;
+                    else color = 0x2ECC71;
                 } else if (baseToken === 'r') {
                     color = 0x27ae60;
-                } else if (baseToken === 'b') {
-                    color = 0xf1c40f;
+                } else if (baseToken.startsWith('b')) {
+                    if (baseToken === 'b1') color = 0xFFD62F;
+                    else if (baseToken === 'b2') color = 0x2ECC71;
+                    else if (baseToken === 'b3') color = 0xD7AC00;
+                    else color = 0x2ECC71;
+
                 } else if (baseToken.startsWith('m')) {
-                    color = 0x7f8c8d;
-                } else if (baseToken.startsWith('g')) {
-                    color = 0x2ecc71;
-                } else if (baseToken.startsWith('i') || tile.type === 'incline') {
-                    color = 0x8bc34a;
+                    if (baseToken === 'm1') color = 0xA2B4B5;
+                    else if (baseToken === 'm2') color = 0x7f8c8d;
+                    else if (baseToken === 'm3') color = 0x627071;
+                    else color = 0x7f8c8d;
+
+
                 }
 
                 poolObj.rect.setPosition(x, y).setFillStyle(color).setVisible(true);
-                poolObj.label.setPosition(x, y).setText(tile.token).setVisible(true);
+                // Use base token for a cleaner label (m2 instead of m2[d90,i20])
+                var labelText = tile.baseToken;
 
-                if (tile.type === 'incline' && tile.angle !== null) {
-                    poolObj.arrow.setPosition(x, y).setAngle(tile.angle).setVisible(true);
+                // Inside Golf.updateMapVisibility, where you configure poolObj.arrow
+                if (tile.direction !== null) {
+                    // Only show arrows if the player is swinging
+                    var player = state.players[0]; // or get the relevant player for local view
+                    if (player && player.state === Golf.PLAYER_STATES.SWINGING) {
+                        var phaserAngle = tile.direction - 90;
+                        var alpha = Phaser.Math.Clamp(0.3 + (tile.incline / 45), 0.3, 1);
+                        var scale = Phaser.Math.Clamp(1 + (tile.incline / 15), 1, 3);
+                        poolObj.arrow.setPosition(x, y)
+                            .setAngle(phaserAngle)
+                            .setAlpha(alpha)
+                            .setScale(scale)
+                            .setVisible(true);
+                    } else {
+                        poolObj.arrow.setVisible(false);
+                    }
+
+                    // Show only the incline in degrees on the label
+                    labelText += "\n" + tile.incline + "°";
                 }
+
+                poolObj.label.setPosition(x, y).setText(labelText).setVisible(true);
 
                 if (tile.isTee) {
                     poolObj.tee.marker.setPosition(x, y).setVisible(true);
@@ -245,16 +309,69 @@
 
         if (state.mapGrid && state.mapGrid[r] && state.mapGrid[r][c]) {
             var tile = state.mapGrid[r][c];
-            if (tile.type === 'incline' && tile.angle !== null) {
-                var rad = Phaser.Math.DegToRad(tile.angle);
+
+            if (tile.type === 'incline' && tile.direction !== null) {
+                var inclineDeg = tile.incline || 0;
+
+                if (inclineDeg === 0) return { x: 0, y: 0 };
+
+                // Compass 0=N, 90=E etc → Phaser conversion
+                var rad = Phaser.Math.DegToRad(tile.direction - 90);
+
+                // Realistic gravity component: sin(angle)
+                var forceMag =
+                    Golf.SLOPE_FORCE_MULT *
+                    Math.sin(Phaser.Math.DegToRad(inclineDeg));
+
                 return {
-                    x: Math.cos(rad) * Golf.SLOPE_FORCE_MULT,
-                    y: Math.sin(rad) * Golf.SLOPE_FORCE_MULT
+                    x: Math.cos(rad) * forceMag,
+                    y: Math.sin(rad) * forceMag
                 };
             }
         }
+
         return { x: 0, y: 0 };
     };
+
+
+    Golf.applySlopePhysics = function (scene, ball) {
+
+        if (!ball || !ball.body) return;
+
+        var body = ball.body;
+
+        // Get slope force at ball position
+        var slope = Golf.getSlopeAt(ball.x, ball.y);
+
+        var vx = body.velocity.x;
+        var vy = body.velocity.y;
+        var speed = Math.sqrt(vx * vx + vy * vy);
+
+        var slopeForceMag = Math.sqrt(slope.x * slope.x + slope.y * slope.y);
+
+        // --- STATIC FRICTION SIMULATION ---
+        if (
+            speed < Golf.STATIC_SPEED_THRESHOLD &&
+            slopeForceMag < Golf.STATIC_FORCE_THRESHOLD
+        ) {
+            // Snap to rest
+            scene.matter.body.setVelocity(body, { x: 0, y: 0 });
+            body.force.x = 0;
+            body.force.y = 0;
+            return;
+        }
+
+        // --- LOW SPEED EXTRA ROLLING RESISTANCE ---
+        if (speed < 0.25) {
+            body.frictionAir = Golf.LOW_SPEED_FRICTION;
+        } else {
+            body.frictionAir = Golf.getFrictionAt(ball.x, ball.y);
+        }
+
+        // --- APPLY DOWNHILL FORCE ---
+        scene.matter.body.applyForce(body, body.position, slope);
+    };
+
 
     /**
      * Spawns a hole at a random predetermined position.
@@ -322,7 +439,7 @@
                 return TERRAIN_TYPES[typeKey].frictionAir;
             }
         }
-        return 0.015; // Default grass friction
+        return 0.01; // Default grass friction
     };
 
     /**
@@ -336,7 +453,7 @@
         if (state.mapGrid && state.mapGrid[r] && state.mapGrid[r][c]) {
             return state.mapGrid[r][c];
         }
-        return { type: 'grass' };
+        return null; // Return null instead of default grass if map is not ready
     };
 
 
@@ -429,7 +546,7 @@
             fontStyle: '900',
             color: '#3498db',
             stroke: '#ffffff',
-            strokeThickness: 4
+            strokeThickness: 0
         }).setOrigin(0.5).setDepth(100);
 
         scene.tweens.add({

@@ -56,6 +56,6 @@
         WATER1: { name: 'Shallow Water', color: 0x5dade2, frictionAir: 0.1, label: 'water1', cartGripMult: 0.4, cartMaxSpeedMult: 0.5, playerSpeedMult: 0.6 },
         WATER2: { name: 'Deep Water', color: 0x3498db, frictionAir: 0.2, label: 'water2', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 },
         WATER3: { name: 'Abyss', color: 0x2874a6, frictionAir: 0.3, label: 'water3', cartGripMult: 0.05, cartMaxSpeedMult: 0.1 },
-        MOUNTAIN: { name: 'Mountain', color: 0x7f8c8d, frictionAir: 0.3, label: 'mountain' }
+        MOUNTAIN: { name: 'Mountain', color: 0x7f8c8d, frictionAir: 0.1, label: 'mountain' }
     };
 })(typeof window !== 'undefined' ? window : this);

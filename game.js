@@ -297,6 +297,14 @@ function update() {
             }
         }
 
+        if (state.players) {
+            state.players.forEach(function (player) {
+                if (player.ball) {
+                    Golf.applySlopePhysics(this, player.ball);
+                }
+            }, this);
+        }
+
         // Golf Cart interaction check
         if (!p.isAI) {
             let nearCart = null;
