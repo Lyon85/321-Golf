@@ -72,6 +72,8 @@
                     isTee: false
                 };
 
+
+
                 // Base Type Logic (terrain only; modifiers already set hole/tee)
                 if (!tileInfo.type || tileInfo.type === 'grass') {
                     if (token.startsWith('w')) {
@@ -92,6 +94,8 @@
                         }
                     } else if (token.startsWith('g')) {
                         tileInfo.type = 'grass';
+                    } else if (token.startsWith('b')) {
+                        tileInfo.type = 'bunker';   // ✅ set type for friction
                     } else if (token === 'r') {
                         tileInfo.type = 'rough';
                     } else if (token.startsWith('m')) {
@@ -250,7 +254,7 @@
                     if (baseToken === 'b1') color = 0xFFD62F;
                     else if (baseToken === 'b2') color = 0x2ECC71;
                     else if (baseToken === 'b3') color = 0xD7AC00;
-                    else color = 0x2ECC71;
+                    else color = 0xFFD62F;
 
                 } else if (baseToken.startsWith('m')) {
                     if (baseToken === 'm1') color = 0xA2B4B5;

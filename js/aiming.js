@@ -155,8 +155,8 @@
                 var finalShotAngle = originalShotAngle + jitter;
 
                 if (isLocal) {
-                    if (tile.type === 'rough' || tile.type === 'sand') {
-                        var label = tile.type === 'rough' ? 'ROUGH!' : 'SAND!';
+                    if (tile.type === 'rough' || tile.type === 'bunker') {
+                        var label = tile.type === 'rough' ? 'ROUGH!' : 'BUNKER!';
                         var color = tile.type === 'rough' ? '#feca57' : '#ff9f43';
                         var txt = scene.add.text(playerX, playerY - 40, label, {
                             family: 'Outfit',

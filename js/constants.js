@@ -51,7 +51,7 @@
     Golf.TERRAIN_TYPES = {
         GRASS: { name: 'Grass', color: 0x2ecc71, frictionAir: 0.015, label: 'grass' },
         ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 0.05, label: 'rough' },
-        SAND: { name: 'Sand', color: 0xf1c40f, frictionAir: 0.2, label: 'sand' },
+        BUNKER: { name: 'Bunker', color: 0xf1c40f, frictionAir: 2.2, label: 'bunker' },
         WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 },
         WATER1: { name: 'Shallow Water', color: 0x5dade2, frictionAir: 0.1, label: 'water1', cartGripMult: 0.4, cartMaxSpeedMult: 0.5, playerSpeedMult: 0.6 },
         WATER2: { name: 'Deep Water', color: 0x3498db, frictionAir: 0.2, label: 'water2', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 },

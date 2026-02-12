@@ -17,7 +17,7 @@
             return;
         }
 
-        // Clear existing clubs if any
+        // Clear existing clubs
         if (state.clubs.length > 0) {
             console.log(`[Clubs] Clearing ${state.clubs.length} existing clubs.`);
             state.clubs.forEach(c => {
@@ -29,60 +29,48 @@
 
         var clubList = [];
 
-        if (data) {
+        if (data && data.length > 0) {
             console.log(`[Clubs] Spawning ${data.length} clubs from server data.`);
-            // Multiplayer Mode: Spawn from server data
-            data.forEach(function (d) {
-                var typeNameUppercase = d.type.name.toUpperCase();
-                console.log(`[Clubs] Processing club ID: ${d.id}, Type: ${d.type.name} (Key: ${typeNameUppercase})`);
-
-                var type = CLUB_TYPES[typeNameUppercase];
-                if (!type) {
-                    console.warn(`[Clubs] Type '${typeNameUppercase}' not found in local definitions. Using server fallback.`);
-                    type = d.type;
-                } else {
-                    console.log(`[Clubs] Successfully matched local type:`, type);
-                }
-
-                if (type) {
-                    createClub(scene, d.x, d.y, type, d.id);
-                } else {
-                    console.error(`[Clubs] Failed to resolve type for club ${d.id}`);
-                }
+            // Multiplayer Mode: spawn from server
+            data.forEach(d => {
+                var typeKey = d.type.name.toUpperCase();
+                var type = Golf.CLUB_TYPES[typeKey] || d.type;
+                createClub(scene, d.x, d.y, type, d.id);
             });
         } else {
-            console.log('[Clubs] Generating 120 random clubs (single-player mode).');
+            console.log('[Clubs] Generating 100 random clubs (single-player mode).');
 
-            // Single-player Mode: Generate Random
-            var types = Object.keys(CLUB_TYPES);
-            var playableTypes = ['grass', 'rough', 'sand', 'incline'];
+            var types = Object.keys(Golf.CLUB_TYPES);
+            var playableTypes = ['grass', 'water', 'bunker', 'mountain'];
 
-            for (var i = 0; i < 120; i++) {
+            var clubsToSpawn = 100;
+            var spawned = 0;
+
+            while (spawned < clubsToSpawn) {
                 var typeKey = types[Phaser.Math.Between(0, types.length - 1)];
-                var type = CLUB_TYPES[typeKey];
+                var type = Golf.CLUB_TYPES[typeKey];
 
-                var x, y, isValid = false, attempts = 0;
-                while (!isValid && attempts < 20) {
-                    x = Phaser.Math.Between(margin, worldWidth - margin);
-                    y = Phaser.Math.Between(margin, worldHeight - margin);
+                var x = Phaser.Math.Between(margin, worldWidth - margin);
+                var y = Phaser.Math.Between(margin, worldHeight - margin);
 
-                    var tile = Golf.getTileAt(x, y);
-                    if (tile && playableTypes.includes(tile.type)) {
-                        isValid = true;
-                    }
-                    attempts++;
+                var tile = Golf.getTileAt(x, y);
+
+                // Always allow spawn if tile missing or not playable
+                if (!tile || !playableTypes.includes(tile.type)) {
+                    tile = { type: 'grass' }; // Force a valid type
                 }
 
-                createClub(scene, x, y, type);
+                // Assign a unique id for single-player clubs
+                var id = 'sp_' + spawned;
 
-                clubList.push({
-                    x: x,
-                    y: y,
-                    typeIndex: typeKey
-                });
+                createClub(scene, x, y, type, id);
+
+                clubList.push({ x: x, y: y, typeIndex: typeKey, id: id });
+                spawned++;
             }
         }
 
+        console.log(`[Clubs] Spawned ${state.clubs.length} clubs.`);
         return clubList;
     };
 
@@ -95,7 +83,6 @@
             color: '#000'
         }).setOrigin(0.5);
 
-        // Store ID for networking
         state.clubs.push({ id: id, sprite: sprite, txt: txt, type: type, x: x, y: y });
 
         scene.tweens.add({
@@ -106,6 +93,7 @@
             repeat: -1
         });
     }
+
 
     Golf.removeClub = function (id) {
         var index = state.clubs.findIndex(function (c) { return c.id === id; });
