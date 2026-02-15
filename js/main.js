@@ -293,16 +293,42 @@
             // --- Terrain Physics (Friction & Slopes) ---
             if (bSpeed > 0.01) {
                 if (p.ballHeight <= 2) {
-                    // Apply Terrain Friction
-                    p.ball.frictionAir = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y);
+                    // Determine terrain under the ball.
+                    // NOTE: many bunker tiles are encoded as "b..." with incline/direction modifiers,
+                    // which change tile.type to "incline". Use baseToken so bunkers are still detected.
+                    var tile = Golf.getTileAt(p.ball.position.x, p.ball.position.y);
+                    var isBunker =
+                        tile &&
+                        (
+                            tile.type === 'bunker' ||
+                            (tile.baseToken && String(tile.baseToken).charAt(0) === 'b')
+                        );
 
-                    // Apply Slopes
-                    var slopeForce = Golf.getSlopeAt(p.ball.position.x, p.ball.position.y);
-                    if (slopeForce.x !== 0 || slopeForce.y !== 0) {
-                        scene.matter.body.applyForce(p.ball, p.ball.position, {
-                            x: slopeForce.x * p.ball.mass,
-                            y: slopeForce.y * p.ball.mass
-                        });
+                    if (isBunker) {
+                        // In bunkers: very high drag and no slope forces.
+                        // This keeps the motion mostly one-way from the hit,
+                        // then lets the ball roll just a short distance before stopping.
+                        var bunkerFriction = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y) * 3;
+                        p.ball.frictionAir = bunkerFriction;
+
+                        // Once the ball is almost stopped in sand, snap it fully to rest.
+                        if (bSpeed < 0.2) {
+                            scene.matter.body.setVelocity(p.ball, { x: 0, y: 0 });
+                            bSpeed = 0;
+                        }
+                    } else {
+                        // Normal terrain behaviour
+                        var baseFriction = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y);
+                        p.ball.frictionAir = baseFriction;
+
+                        // Apply Slopes
+                        var slopeForce = Golf.getSlopeAt(p.ball.position.x, p.ball.position.y);
+                        if (slopeForce.x !== 0 || slopeForce.y !== 0) {
+                            scene.matter.body.applyForce(p.ball, p.ball.position, {
+                                x: slopeForce.x * p.ball.mass,
+                                y: slopeForce.y * p.ball.mass
+                            });
+                        }
                     }
                 } else {
                     // Reset to default friction in air

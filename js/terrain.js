@@ -344,6 +344,10 @@
 
         var body = ball.body;
 
+        // Determine terrain under the ball (for sand/bunker behavior etc.)
+        var tile = Golf.getTileAt(ball.x, ball.y);
+        var isBunker = tile && tile.type === 'bunker';
+
         // Get slope force at ball position
         var slope = Golf.getSlopeAt(ball.x, ball.y);
 
@@ -351,11 +355,28 @@
         var vy = body.velocity.y;
         var speed = Math.sqrt(vx * vx + vy * vy);
 
+        // In bunkers, aggressively squash velocity every frame so the ball
+        // loses almost all of its momentum as soon as it hits the sand.
+        if (isBunker && speed > 0.4) {
+            var damp = 0.18; // keep only ~18% of current speed
+            scene.matter.body.setVelocity(body, { x: vx * damp, y: vy * damp });
+            vx = body.velocity.x;
+            vy = body.velocity.y;
+            speed = Math.sqrt(vx * vx + vy * vy);
+        }
+
         var slopeForceMag = Math.sqrt(slope.x * slope.x + slope.y * slope.y);
 
         // --- STATIC FRICTION SIMULATION ---
+        // In bunkers we want the ball to come to rest much more aggressively,
+        // so we use a higher effective "static" threshold there.
+        var staticSpeedThreshold = Golf.STATIC_SPEED_THRESHOLD;
+        if (isBunker) {
+            staticSpeedThreshold = 0.8;
+        }
+
         if (
-            speed < Golf.STATIC_SPEED_THRESHOLD &&
+            speed < staticSpeedThreshold &&
             slopeForceMag < Golf.STATIC_FORCE_THRESHOLD
         ) {
             // Snap to rest
@@ -366,10 +387,13 @@
         }
 
         // --- LOW SPEED EXTRA ROLLING RESISTANCE ---
-        if (speed < 0.25) {
+        // For bunkers, always use the dedicated (very high) friction so the ball
+        // virtually stops as soon as it touches sand.
+        if (!isBunker && speed < 0.25) {
             body.frictionAir = Golf.LOW_SPEED_FRICTION;
         } else {
-            body.frictionAir = Golf.getFrictionAt(ball.x, ball.y);
+            var baseFriction = Golf.getFrictionAt(ball.x, ball.y);
+            body.frictionAir = isBunker ? baseFriction * 3 : baseFriction;
         }
 
         // --- APPLY DOWNHILL FORCE ---
