@@ -148,14 +148,23 @@
                         }
                     }
 
-                    // Sync Visibility (Driving)
-                    localP.remoteDriving = data.driving; // Store state for main loop
+                    // Sync Driving State (Enforce Physics/Sensor state)
                     if (data.driving) {
-                        localP.sprite.setAlpha(0);
-                        localP.ballSprite.setAlpha(0);
+                        if (!localP.driving) {
+                            // Player should be in cart but isn't. Force enter.
+                            // Assuming Player N owns Cart N
+                            var cart = Golf.state.golfCarts[localP.playerIndex];
+                            if (cart) {
+                                console.log('[Networking] Remote player entering cart:', localP.playerIndex);
+                                Golf.enterCart(localP, cart);
+                            }
+                        }
                     } else {
-                        localP.sprite.setAlpha(1);
-                        localP.ballSprite.setAlpha(1);
+                        if (localP.driving) {
+                            // Player should not be in cart but is. Force exit.
+                            console.log('[Networking] Remote player exiting cart:', localP.playerIndex);
+                            Golf.exitCart(localP);
+                        }
                     }
                 }
             });
@@ -181,12 +190,15 @@
                 // data = { index, x, y, angle }
                 var cart = Golf.state.golfCarts[data.index];
                 if (cart) {
-                    // Sync Physics
-                    scene.matter.body.setPosition(cart.body, { x: data.x, y: data.y });
-                    scene.matter.body.setAngle(cart.body, data.angle);
-
-                    // Sync Visuals immediately (don't wait for main loop)
-                    cart.sprite.setPosition(data.x, data.y);
+                    // Store target for interpolation in main loop
+                    cart.netTarget = {
+                        x: data.x,
+                        y: data.y,
+                        angle: data.angle,
+                        vx: data.vx || 0,
+                        vy: data.vy || 0,
+                        timestamp: Date.now() // Track freshness
+                    };
                 }
             });
 
@@ -348,7 +360,9 @@
                 index: index,
                 x: cart.body.position.x,
                 y: cart.body.position.y,
-                angle: cart.body.angle
+                angle: cart.body.angle,
+                vx: cart.body.velocity.x,
+                vy: cart.body.velocity.y
             });
         },
 

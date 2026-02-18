@@ -17,7 +17,7 @@
 
 #golfer {
     transform-style: preserve-3d;
-    transform: rotateX(-20deg) rotateY(calc(45deg + var(--dir-rotate, 0deg)));
+    transform: rotateX(-20deg) rotateY(calc(45deg + var(--dir-rotate, 0deg) + var(--aim-side-rotate, 0deg)));
     position: relative;
     scale: 0.25;
     transition: transform 0.15s ease-out;
@@ -140,6 +140,10 @@
 
 .torso .left {
     transform: rotateY(-90deg) translateZ(20px);
+}
+
+.torso .right {
+    transform: rotateY(-90deg) translateZ(60px);
 }
 
 .torso .top,
@@ -370,4 +374,18 @@
         transform: translateY(180px) rotateX(90deg) scale(1.1);
         opacity: 0.2;
     }
+}
+
+.player-container.aiming #golfer {
+    --aim-side-rotate: -60deg;
+}
+
+.player-container.aiming .arm.left {
+    transform: rotateX(0) rotateZ(90deg);
+
+}
+
+.player-container.aiming .arm.right {
+    transform: rotateX(0) rotateZ(90deg) translateX(50px) translateY(60px);
+
 }

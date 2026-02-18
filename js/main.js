@@ -511,9 +511,59 @@
 
         // Update Carts (Moved outside player loop)
         state.golfCarts.forEach(function (cart, index) {
+            // Check if local player is driving this cart
+            var localP = state.players[localPlayerIndex];
+            var isLocalDriving = (localP && localP.driving === cart);
+
+            // Interpolation for Remote Carts
+            if (!isLocalDriving && cart.netTarget) {
+                // Only interpolate if data is fresh (< 200ms)
+                // This prevents "rubber banding" to an old position when pushing an empty cart
+                var isFresh = (Date.now() - cart.netTarget.timestamp) < 200;
+
+                if (isFresh) {
+                    var targetX = cart.netTarget.x;
+                    var targetY = cart.netTarget.y;
+                    var targetVX = cart.netTarget.vx || 0;
+                    var targetVY = cart.netTarget.vy || 0;
+
+                    // Distance Check for Teleport (Snap if error > 50px)
+                    var dist = Phaser.Math.Distance.Between(cart.body.position.x, cart.body.position.y, targetX, targetY);
+
+                    if (dist > 50) {
+                        // Snap immediately if too far
+                        scene.matter.body.setPosition(cart.body, { x: targetX, y: targetY });
+                        scene.matter.body.setVelocity(cart.body, { x: targetVX, y: targetVY });
+                    } else {
+                        // Smooth Interpolation
+                        // 1. Set velocity to target velocity to maintain momentum prediction
+                        scene.matter.body.setVelocity(cart.body, { x: targetVX, y: targetVY });
+
+                        // 2. Nudge position towards target (Error Correction)
+                        // Lower factor (0.1 - 0.2) is smoother but "lazier". Higher is snappier but jittery.
+                        var lerpFactor = 0.2;
+                        var newX = Phaser.Math.Linear(cart.body.position.x, targetX, lerpFactor);
+                        var newY = Phaser.Math.Linear(cart.body.position.y, targetY, lerpFactor);
+
+                        scene.matter.body.setPosition(cart.body, { x: newX, y: newY });
+                    }
+
+                    // Smoothly rotate
+                    var currentAngle = cart.body.angle;
+                    var targetAngle = cart.netTarget.angle;
+                    var diff = targetAngle - currentAngle;
+                    // Normalize to -PI to +PI
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+
+                    scene.matter.body.setAngle(cart.body, currentAngle + diff * 0.2);
+                }
+            }
+
             var cartElevation = Golf.getElevationAt(cart.body.position.x, cart.body.position.y);
             cart.sprite.setPosition(cart.body.position.x, cart.body.position.y - cartElevation);
             cart.sprite.setDepth(cart.body.position.y + 40);
+
             // Sync rotation via CSS variable
             var angleDeg = Phaser.Math.RadToDeg(cart.body.angle);
             // Invert the rotation direction and use 180 deg offset to match physics
@@ -521,10 +571,43 @@
             var snappedAngle = 180 - (Math.round(angleDeg / 6) * 6);
             cart.sprite.node.querySelector('.cart-visual').style.setProperty('--cart-rotate', snappedAngle + 'deg');
 
-            // If local player is driving this cart, send update
-            var localP = state.players[localPlayerIndex];
-            if (localP && localP.driving === cart && Golf.Networking) {
-                Golf.Networking.sendCartUpdate(index, cart);
+            // --- Sticky Pushing Logic ---
+            var isPushedByLocal = false;
+            if (localP && !isLocalDriving && !localP.driving) {
+                // Check if I am physically pushing (Close + Moving)
+                var dist = Phaser.Math.Distance.Between(localP.body.position.x, localP.body.position.y, cart.body.position.x, cart.body.position.y);
+                var speed = Math.sqrt(cart.body.velocity.x * cart.body.velocity.x + cart.body.velocity.y * cart.body.velocity.y);
+
+                // If I'm close and it's moving, CLAIM ownership
+                // Increased radius to 150 because cart is 160px long (center to end is 80px)
+                if (dist < 150 && speed > 0.1) {
+                    cart.lastPusher = localPlayerIndex;
+                }
+
+                // If I own the "push", maintain authority until it stops
+                if (cart.lastPusher === localPlayerIndex) {
+                    if (speed > 0.05) {
+                        isPushedByLocal = true;
+                    } else {
+                        // It stopped moving, release ownership
+                        cart.lastPusher = null;
+                        // (And don't send updates for stationary object)
+                    }
+                }
+            }
+
+            // If local player is driving OR pushing this cart, send update (THROTTLED)
+            if ((isLocalDriving || isPushedByLocal) && Golf.Networking) {
+                var now = Date.now();
+                if (!cart.lastNetworkUpdate || now - cart.lastNetworkUpdate > 33) { // ~30 updates/sec
+                    Golf.Networking.sendCartUpdate(index, cart);
+                    cart.lastNetworkUpdate = now;
+                    // Debug: Log every second to confirm pushing logic
+                    if (isPushedByLocal && (!cart.lastPushLog || now - cart.lastPushLog > 1000)) {
+                        console.log('[Main] Sending Cart Update (Pushing):', index, 'Dist:', Math.floor(dist || 0));
+                        cart.lastPushLog = now;
+                    }
+                }
             }
         });
 
