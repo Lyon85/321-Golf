@@ -35,7 +35,7 @@
             data.forEach(d => {
                 var typeKey = d.type.name.toUpperCase();
                 var type = Golf.CLUB_TYPES[typeKey] || d.type;
-                createClub(scene, d.x, d.y, type, d.id);
+                Golf.createClub(scene, d.x, d.y, type, d.id);
             });
         } else {
             console.log('[Clubs] Generating 100 random clubs (single-player mode).');
@@ -63,7 +63,7 @@
                 // Assign a unique id for single-player clubs
                 var id = 'sp_' + spawned;
 
-                createClub(scene, x, y, type, id);
+                Golf.createClub(scene, x, y, type, id);
 
                 clubList.push({ x: x, y: y, typeIndex: typeKey, id: id });
                 spawned++;
@@ -74,7 +74,7 @@
         return clubList;
     };
 
-    function createClub(scene, x, y, type, id) {
+    Golf.createClub = function (scene, x, y, type, id) {
         var sprite = scene.add.rectangle(x, y, 34, 34, type.color).setStrokeStyle(2, 0xffffff);
         var txt = scene.add.text(x, y, type.name.charAt(0), {
             family: 'Outfit',
@@ -96,7 +96,8 @@
 
 
     Golf.removeClub = function (id) {
-        var index = state.clubs.findIndex(function (c) { return c.id === id; });
+        // Use loose equality == to handle string/number ID mismatch
+        var index = state.clubs.findIndex(function (c) { return c.id == id; });
         if (index !== -1) {
             var c = state.clubs[index];
             if (c.sprite) c.sprite.destroy();
@@ -105,18 +106,31 @@
             console.log('[Clubs] Club removed:', id);
             return c.type; // Return type so we can add to inventory if needed
         }
+        console.warn('[Clubs] Club NOT found for removal:', id);
         return null;
     };
 
     Golf.updateClubUI = function (p) {
-        console.log(`[UI] Updating Club UI for Player ${p.playerIndex}. Items: ${p.inventory.length}`);
         var scene = state.game.scene.scenes[0];
+        // Clear slots first
+        if (scene.clubSlots) {
+            scene.clubSlots.forEach(el => {
+                if (!el) return;
+                el.innerText = '-';
+                el.classList.add('empty');
+                el.classList.remove('active');
+                el.style.border = '1px solid #444';
+                el.style.boxShadow = 'none';
+            });
+        }
+
         p.inventory.forEach(function (club, i) {
             var el = scene.clubSlots[i];
+            if (!el) return;
             el.innerText = club.name;
-            el.classList.remove('empty', 'active');
+            el.classList.remove('empty');
             var isActive = p.activeClub === club;
-            var colorHex = '#' + club.color.toString(16).padStart(6, '0');
+            var colorHex = '#' + (club.color !== undefined ? club.color.toString(16).padStart(6, '0') : 'ffffff');
             el.style.border = isActive ? '4px solid ' + colorHex : '3px solid ' + colorHex;
             el.style.boxShadow = isActive ? '0 0 12px ' + colorHex : 'none';
             if (isActive) el.classList.add('active');

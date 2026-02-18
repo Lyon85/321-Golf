@@ -21,10 +21,10 @@ app.get('/', (req, res) => {
 const rooms = {};
 
 const CLUB_TYPES = [
-    { name: 'Driver', color: 0xff4757 },
-    { name: 'Iron', color: 0x2ed573 },
-    { name: 'Putter', color: 0x1e90ff },
-    { name: 'Wedge', color: 0xffa502 }
+    { name: 'Driver', power: 0.015, accuracy: 0.7, color: 0xffd32a, arc: 1.5 },
+    { name: 'Iron', power: 0.009, accuracy: 0.95, color: 0xff3f34, arc: 1.0 },
+    { name: 'Putter', power: 0.005, accuracy: 1.0, color: 0x0fbcf9, arc: 0 },
+    { name: 'Wedge', power: 0.007, accuracy: 1.0, color: 0xffa502, arc: 1.0 } // Wedge added for future
 ];
 
 function generateFixedClubs(width, height) {
@@ -167,11 +167,50 @@ io.on('connection', (socket) => {
         const code = socket.roomCode;
         if (code && rooms[code]) {
             const room = rooms[code];
-            const club = room.clubs.find(c => c.id === clubId);
+            const club = room.clubs.find(c => c.id == clubId);
             if (club && !club.taken) {
                 club.taken = true;
                 io.to(code).emit('clubTaken', { clubId: clubId, playerId: socket.id });
+                socket.emit('debugMsg', `Pickup Success: ID ${clubId}`);
+            } else {
+                socket.emit('debugMsg', `Pickup Rejected: ID=${clubId}, Found=${!!club}, Taken=${club ? club.taken : 'N/A'}`);
             }
+        }
+    });
+
+    socket.on('requestSwap', (data) => {
+        try {
+            const code = socket.roomCode;
+            if (code && rooms[code]) {
+                const room = rooms[code];
+                socket.emit('debugMsg', `Swap Start: PickupID=${data.pickupClubId}, DropName=${data.droppedClubName}`);
+
+                const club = room.clubs.find(c => c.id == data.pickupClubId);
+
+                if (club && !club.taken) {
+                    club.taken = true;
+                    const type = CLUB_TYPES.find(t => t.name.toLowerCase() === (data.droppedClubName || 'iron').toLowerCase()) || CLUB_TYPES[1];
+                    const droppedId = 'd_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                    const newClub = { id: droppedId, x: data.x, y: data.y, type: type, taken: false };
+                    room.clubs.push(newClub);
+
+                    io.to(code).emit('clubSpawned', newClub);
+                    io.to(code).emit('clubTaken', {
+                        clubId: data.pickupClubId,
+                        playerId: socket.id,
+                        swap: true,
+                        droppedType: type
+                    });
+                    socket.emit('debugMsg', `Swap Success: Dropped ${data.droppedClubName}, Picked ID ${data.pickupClubId}`);
+                } else {
+                    socket.emit('debugMsg', `Swap Rejected: ID=${data.pickupClubId}, Found=${!!club}, Taken=${club ? club.taken : 'N/A'}`);
+                }
+            } else {
+                socket.emit('debugMsg', `Swap Error: RoomCode=${code}, RoomExists=${!!rooms[code]}`);
+            }
+        } catch (e) {
+            console.error('[Server] CRASH in requestSwap:', e);
+            socket.emit('debugMsg', `Swap CRASH: ${e.message}`);
         }
     });
 
@@ -252,5 +291,6 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`[Server] VERSION 1.2 (Swap Fix + Power/Accuracy + DebugMsg) started on port ${PORT}`);
+    console.log(`[Server] Current Time: ${new Date().toISOString()}`);
 });

@@ -49,13 +49,20 @@
     };
 
     Golf.TERRAIN_TYPES = {
-        GRASS: { name: 'Grass', color: 0x2ecc71, frictionAir: 0.015, label: 'grass' },
-        ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 0.05, label: 'rough' },
-        BUNKER: { name: 'Bunker', color: 0xf1c40f, frictionAir: 2.2, label: 'bunker' },
-        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 },
-        WATER1: { name: 'Shallow Water', color: 0x5dade2, frictionAir: 0.1, label: 'water1', cartGripMult: 0.4, cartMaxSpeedMult: 0.5, playerSpeedMult: 0.6 },
-        WATER2: { name: 'Deep Water', color: 0x3498db, frictionAir: 0.2, label: 'water2', cartGripMult: 0.1, cartMaxSpeedMult: 0.2 },
-        WATER3: { name: 'Abyss', color: 0x2874a6, frictionAir: 0.3, label: 'water3', cartGripMult: 0.05, cartMaxSpeedMult: 0.1 },
-        MOUNTAIN: { name: 'Mountain', color: 0x7f8c8d, frictionAir: 0.1, label: 'mountain' }
+        GRASS: { name: 'Grass', color: 0x2ecc71, frictionAir: 0.015, label: 'grass', elevation: 0 },
+        G1: { name: 'Grass 1', color: 0x6BD99A, frictionAir: 0.015, label: 'g1', elevation: 0 },
+        G2: { name: 'Grass 2', color: 0x2ECC71, frictionAir: 0.015, label: 'g2', elevation: 0 },
+        G3: { name: 'Grass 3', color: 0x15964B, frictionAir: 0.015, label: 'g3', elevation: 0 },
+        ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 0.05, label: 'rough', elevation: 5 },
+        BUNKER: { name: 'Bunker', color: 0xf1c40f, frictionAir: 2.2, label: 'bunker', elevation: 0 },
+        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', elevation: 0 },
+
+        WATER1: { name: 'Shallow Water', color: 0x5dade2, frictionAir: 0.1, label: 'water1', elevation: 0 },
+        WATER2: { name: 'Deep Water', color: 0x3498db, frictionAir: 0.2, label: 'water2', elevation: 0 },
+        WATER3: { name: 'Abyss', color: 0x2874a6, frictionAir: 0.3, label: 'water3', elevation: 0 },
+        MOUNTAIN: { name: 'Mountain', color: 0x7f8c8d, frictionAir: 0.1, label: 'mountain', elevation: 20 },
+        M1: { name: 'Mountain 1', color: 0xA2B4B5, frictionAir: 0.1, label: 'm1', elevation: 30 },
+        M2: { name: 'Mountain 2', color: 0x7f8c8d, frictionAir: 0.1, label: 'm2', elevation: 40 },
+        M3: { name: 'Mountain 3', color: 0x627071, frictionAir: 0.1, label: 'm3', elevation: 100 }
     };
 })(typeof window !== 'undefined' ? window : this);

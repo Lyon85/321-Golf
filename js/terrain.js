@@ -160,11 +160,18 @@
 
         state.tilePool = [];
         for (var i = 0; i < poolSize; i++) {
+            // Base rectangle for non-textured tiles
             var rect = scene.add.rectangle(0, 0, config.tileSize, config.tileSize, 0xffffff)
                 .setStrokeStyle(0, 0x000000, 0.3)
                 .setDepth(-11)
                 .setVisible(false);
 
+            // Side rectangle for 3D depth
+            var side = scene.add.rectangle(0, 0, config.tileSize, 1, 0x000000)
+                .setDepth(-12) // Behind top faces but in front of ground
+                .setVisible(false);
+
+            // Debug/Info Labels
             var label = scene.add.text(0, 0, '', {
                 family: 'monospace',
                 fontSize: '12px',
@@ -172,6 +179,7 @@
                 align: 'center'
             }).setOrigin(0.5, 1.5).setAlpha(0.6).setDepth(-10).setVisible(false);
 
+            // Slope Arrows
             var arrow = scene.add.text(0, 0, '→', {
                 family: 'monospace',
                 fontSize: '24px',
@@ -179,6 +187,7 @@
                 fontStyle: '900'
             }).setOrigin(0.5).setAlpha(0.7).setDepth(-10).setVisible(false);
 
+            // Tee Visuals
             var teeMarker = scene.add.circle(0, 0, 12, 0xff0000).setDepth(-9).setVisible(false);
             var teeInner = scene.add.circle(0, 0, 8, 0xff6b6b).setDepth(-8).setVisible(false);
             var teeText = scene.add.text(0, 0, 'TEE', {
@@ -188,18 +197,28 @@
                 fontStyle: 'bold'
             }).setOrigin(0.5).setDepth(-7).setVisible(false);
 
+            // 1. Create the single image object for the pool
+            // We initialize with g1, but updateMapVisibility will swap it to g2 if needed
+            var img = scene.add.image(0, 0, 'grass_g1_texture').setDepth(-11).setVisible(false);
+
+            // 2. Scale the image to perfectly match the tileSize
+            // Use setDisplaySize to force the image to match your grid pixels
+            img.setDisplaySize(config.tileSize, config.tileSize);
+
+            // 3. Add to pool and worldGroup
             state.tilePool.push({
                 rect: rect,
+                side: side,
+                img: img,
                 label: label,
                 arrow: arrow,
                 tee: { marker: teeMarker, inner: teeInner, text: teeText }
             });
 
-            state.worldGroup.add([rect, label, arrow, teeMarker, teeInner, teeText]);
+            state.worldGroup.add([rect, side, img, label, arrow, teeMarker, teeInner, teeText]);
         }
         state.poolIdx = 0;
     };
-
     /**
      * Updates which tiles are visible based on the camera viewport.
      */
@@ -214,9 +233,11 @@
         var startRow = Math.max(0, Math.floor(cam.scrollY / config.tileSize));
         var endRow = Math.min(config.rows - 1, Math.ceil((cam.scrollY + cam.height) / config.tileSize));
 
-        // Hide all pooled objects first
+        // Hide all pooled objects first to prevent ghosts
         state.tilePool.forEach(function (p) {
             p.rect.setVisible(false);
+            p.side.setVisible(false);
+            p.img.setVisible(false); // Make sure the image is reset too
             p.label.setVisible(false);
             p.arrow.setVisible(false);
             p.tee.marker.setVisible(false);
@@ -234,7 +255,7 @@
                 var x = c * config.tileSize + config.tileSize / 2;
                 var y = r * config.tileSize + config.tileSize / 2;
 
-                // Configure base rectangle (use baseToken for color so g3[i90] colors as g3)
+                // Configure base color for non-textured tiles
                 var color = 0x2ecc71; // Default Grass
                 var baseToken = tile.baseToken != null ? tile.baseToken : tile.token;
 
@@ -255,25 +276,101 @@
                     else if (baseToken === 'b2') color = 0x2ECC71;
                     else if (baseToken === 'b3') color = 0xD7AC00;
                     else color = 0xFFD62F;
-
                 } else if (baseToken.startsWith('m')) {
                     if (baseToken === 'm1') color = 0xA2B4B5;
                     else if (baseToken === 'm2') color = 0x7f8c8d;
                     else if (baseToken === 'm3') color = 0x627071;
                     else color = 0x7f8c8d;
-
-
                 }
 
-                poolObj.rect.setPosition(x, y).setFillStyle(color).setVisible(true);
-                // Use base token for a cleaner label (m2 instead of m2[d90,i20])
-                var labelText = tile.baseToken;
+                var elevation = Golf.getElevationAt(x, y);
 
-                // Inside Golf.updateMapVisibility, where you configure poolObj.arrow
+                // Apply 3D elevation shift (top Y is actual Y - elevation)
+                var topY = y - elevation;
+
+                // --- TEXTURE LOGIC FOR G1 AND G2 ---
+                // 1. Define which tokens should use images and what their texture keys are
+                var textureMap = {
+                    'g1': 'grass_g1_texture',
+                    'g2': 'grass_g2_texture',
+                    'g3': 'grass_g3_texture',
+                    'w1': 'water_w1_texture',
+                    'w2': 'water_w2_texture',
+                    'w3': 'water_w3_texture',
+                    'b': 'bunker_b1_texture',
+                    'b2': 'bunker_b2_texture',
+                    'b3': 'bunker_b3_texture',
+                    'm1': 'mountain_m1_texture',
+                    'm2': 'mountain_m2_texture',
+                    'm3': 'mountain_m3_texture'
+                };
+
+                if (textureMap[baseToken]) {
+                    poolObj.rect.setVisible(false);
+                    poolObj.img.setTexture(textureMap[baseToken])
+                        .setPosition(x, topY)
+                        .setDisplaySize(config.tileSize, config.tileSize)
+                        .setVisible(true);
+
+                    // --- SINE WAVE SHIMMER FOR WATER ---
+                    if (baseToken.startsWith('w')) {
+                        // scene.time.now is a millisecond counter
+                        // Dividing by 500 controls the speed (higher = slower)
+                        // Adding (r + c) offsets the wave so tiles don't flash all at once
+                        var wave = Math.sin((scene.time.now / 600) + (r + c) * 0.5);
+
+                        // Map the wave (-1 to 1) to a brightness range (0.7 to 1.0)
+                        var brightness = Phaser.Math.Linear(0.7, 1.0, (wave + 1) / 2);
+
+                        // Create a color tint (RGB). We keep Blue high and vary Red/Green.
+                        // This creates a "sparkle" effect
+                        var colorValue = Math.floor(255 * brightness);
+                        poolObj.img.setTint(Phaser.Display.Color.GetColor(colorValue, colorValue, 255));
+                    } else {
+                        // Clear tint for grass/other tiles so they don't look blue
+                        poolObj.img.clearTint();
+                    }
+                } else {
+                    poolObj.img.setVisible(false);
+                    poolObj.rect.setPosition(x, topY).setFillStyle(color).setVisible(true);
+                }
+
+                // Render side faces for 3D depth
+                if (elevation !== 0) {
+                    var sideColor = Phaser.Display.Color.ValueToColor(color).darken(30).color;
+                    var sideHeight = Math.abs(elevation);
+                    var sideY = (elevation > 0) ? (topY + config.tileSize / 2 + sideHeight / 2) : (topY - config.tileSize / 2 - sideHeight / 2);
+
+                    if (elevation < 0) {
+                        // For recessed blocks like water/bunker, the side is the "wall" from ground down to the top face
+                        sideY = topY - config.tileSize / 2 - sideHeight / 2;
+                        // Actually, if it's recessed, we draw the side ABOVE the top face to ground level (y - tile/2)
+                        var groundY = y - config.tileSize / 2;
+                        var faceTopEdge = topY - config.tileSize / 2;
+                        sideHeight = Math.abs(faceTopEdge - groundY);
+                        sideY = groundY + sideHeight / 2;
+                    } else {
+                        // For raised blocks, the side is from the top face down to ground level
+                        var groundY = y + config.tileSize / 2;
+                        var faceBottomEdge = topY + config.tileSize / 2;
+                        sideHeight = Math.abs(faceBottomEdge - groundY);
+                        sideY = groundY - sideHeight / 2;
+                    }
+
+                    poolObj.side.setPosition(x, sideY)
+                        .setSize(config.tileSize, sideHeight)
+                        .setFillStyle(sideColor)
+                        .setVisible(true);
+                } else {
+                    poolObj.side.setVisible(false);
+                }
+
+                // --- LABELS AND ARROWS ---
+                var labelText = tile.baseToken;
+                var isRightDown = scene.input.activePointer.rightButtonDown();
+
                 if (tile.direction !== null) {
-                    // Only show arrows if the player is swinging
-                    var player = state.players[0]; // or get the relevant player for local view
-                    if (player && player.state === Golf.PLAYER_STATES.SWINGING) {
+                    if (isRightDown) {
                         var phaserAngle = tile.direction - 90;
                         var alpha = Phaser.Math.Clamp(0.3 + (tile.incline / 45), 0.3, 1);
                         var scale = Phaser.Math.Clamp(1 + (tile.incline / 15), 1, 3);
@@ -285,12 +382,10 @@
                     } else {
                         poolObj.arrow.setVisible(false);
                     }
-
-                    // Show only the incline in degrees on the label
                     labelText += "\n" + tile.incline + "°";
                 }
 
-                poolObj.label.setPosition(x, y).setText(labelText).setVisible(true);
+                poolObj.label.setPosition(x, y).setText(labelText).setVisible(isRightDown);
 
                 if (tile.isTee) {
                     poolObj.tee.marker.setPosition(x, y).setVisible(true);
@@ -302,7 +397,6 @@
             }
         }
     };
-
     /**
      * Returns a force vector based on the incline at (x, y).
      */
@@ -344,6 +438,10 @@
 
         var body = ball.body;
 
+        // Determine terrain under the ball (for sand/bunker behavior etc.)
+        var tile = Golf.getTileAt(ball.x, ball.y);
+        var isBunker = tile && tile.type === 'bunker';
+
         // Get slope force at ball position
         var slope = Golf.getSlopeAt(ball.x, ball.y);
 
@@ -351,11 +449,28 @@
         var vy = body.velocity.y;
         var speed = Math.sqrt(vx * vx + vy * vy);
 
+        // In bunkers, aggressively squash velocity every frame so the ball
+        // loses almost all of its momentum as soon as it hits the sand.
+        if (isBunker && speed > 0.4) {
+            var damp = 0.18; // keep only ~18% of current speed
+            scene.matter.body.setVelocity(body, { x: vx * damp, y: vy * damp });
+            vx = body.velocity.x;
+            vy = body.velocity.y;
+            speed = Math.sqrt(vx * vx + vy * vy);
+        }
+
         var slopeForceMag = Math.sqrt(slope.x * slope.x + slope.y * slope.y);
 
         // --- STATIC FRICTION SIMULATION ---
+        // In bunkers we want the ball to come to rest much more aggressively,
+        // so we use a higher effective "static" threshold there.
+        var staticSpeedThreshold = Golf.STATIC_SPEED_THRESHOLD;
+        if (isBunker) {
+            staticSpeedThreshold = 0.8;
+        }
+
         if (
-            speed < Golf.STATIC_SPEED_THRESHOLD &&
+            speed < staticSpeedThreshold &&
             slopeForceMag < Golf.STATIC_FORCE_THRESHOLD
         ) {
             // Snap to rest
@@ -366,10 +481,13 @@
         }
 
         // --- LOW SPEED EXTRA ROLLING RESISTANCE ---
-        if (speed < 0.25) {
+        // For bunkers, always use the dedicated (very high) friction so the ball
+        // virtually stops as soon as it touches sand.
+        if (!isBunker && speed < 0.25) {
             body.frictionAir = Golf.LOW_SPEED_FRICTION;
         } else {
-            body.frictionAir = Golf.getFrictionAt(ball.x, ball.y);
+            var baseFriction = Golf.getFrictionAt(ball.x, ball.y);
+            body.frictionAir = isBunker ? baseFriction * 3 : baseFriction;
         }
 
         // --- APPLY DOWNHILL FORCE ---
@@ -403,8 +521,8 @@
         console.log('Spawning hole at position:', holePos);
 
         // Create hole visual
-        var holeCircle = scene.add.circle(holePos.x, holePos.y, 12, 0x000000).setDepth(-9);
-        var holeInner = scene.add.circle(holePos.x, holePos.y, 8, 0x1a1a1a).setDepth(-8);
+        var holeCircle = scene.add.circle(holePos.x, holePos.y, 4, 0x000000).setDepth(-9);
+        var holeInner = scene.add.circle(holePos.x, holePos.y, 2.5, 0x1a1a1a).setDepth(-8);
         var flagPole = scene.add.line(holePos.x, holePos.y, 0, 0, 0, -30, 0x8b4513, 2).setOrigin(0, 0).setDepth(-7);
         var flag = scene.add.triangle(holePos.x, holePos.y - 30, 0, 0, 15, -8, 0, -16, 0xff0000).setDepth(-7);
 
@@ -444,6 +562,39 @@
             }
         }
         return 0.01; // Default grass friction
+    };
+
+    /**
+     * Returns the elevation at (x, y).
+     */
+    Golf.getElevationAt = function (x, y) {
+        var config = Golf.MAP_CONFIG;
+        var c = Math.floor(x / config.tileSize);
+        var r = Math.floor(y / config.tileSize);
+
+        if (state.mapGrid && state.mapGrid[r] && state.mapGrid[r][c]) {
+            var tile = state.mapGrid[r][c];
+            var baseToken = tile.baseToken != null ? tile.baseToken : tile.token;
+
+            var elevation = 0;
+            var baseTypeKey = baseToken.startsWith('w') ? 'WATER' :
+                (baseToken.startsWith('g') ? 'GRASS' :
+                    (baseToken === 'r' ? 'ROUGH' :
+                        (baseToken.startsWith('b') ? 'BUNKER' :
+                            (baseToken.startsWith('m') ? 'MOUNTAIN' : null))));
+
+            // 1. Check for specific subtype first (e.g., G1, M2, W1)
+            var subTypeKey = baseToken.toUpperCase();
+            if (TERRAIN_TYPES[subTypeKey] && TERRAIN_TYPES[subTypeKey].elevation !== undefined) {
+                elevation = TERRAIN_TYPES[subTypeKey].elevation;
+            }
+            // 2. Fallback to base type (e.g., GRASS, WATER)
+            else if (baseTypeKey && TERRAIN_TYPES[baseTypeKey]) {
+                elevation = TERRAIN_TYPES[baseTypeKey].elevation || 0;
+            }
+            return elevation;
+        }
+        return 0;
     };
 
     /**

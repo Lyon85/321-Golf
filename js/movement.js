@@ -83,4 +83,21 @@
         });
     };
 
+    /**
+     * Orchestrates human input (Movement + Aiming).
+     */
+    Golf.handleHumanInput = function (scene, p, delta) {
+        if (p.driving) {
+            // Updated to actually call driving logic
+            if (Golf.handleDriving) {
+                Golf.handleDriving(scene, p, null, delta);
+            }
+            return;
+        }
+        Golf.handlePlayerMovement(scene, p);
+        if (Golf.handleAiming) {
+            Golf.handleAiming(scene, p);
+        }
+    };
+
 })(typeof window !== 'undefined' ? window : this);

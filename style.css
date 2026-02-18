@@ -6,6 +6,14 @@
     --accent: #2ed573;
     --background: #1e272e;
     --white: #ffffff;
+
+    /* Voxel Palette */
+    --skin: #ffdbac;
+    --skin-dark: #e8be9e;
+    --vest: #2980b9;
+    --vest-dark: #2471a3;
+    --pants: #ecf0f1;
+    --wood: #795548;
 }
 
 * {

@@ -8,7 +8,7 @@
     var CAT_CAR = Golf.CAT_CAR;
 
     Golf.createGolfCart = function (scene, x, y, color, ownerId) {
-        var body = scene.matter.add.rectangle(x, y, 60, 100, {
+        var body = scene.matter.add.rectangle(x, y, 60, 160, {
             chamfer: { radius: 10 },
             friction: 0.5,
             frictionAir: 0.03,
@@ -22,16 +22,37 @@
             }
         });
 
-        var sprite = scene.add.container(x, y);
-        // Use the player's color for the base
-        var base = scene.add.rectangle(0, 0, 60, 100, color || 0xf1c40f).setStrokeStyle(4, 0x000000);
-        var roof = scene.add.rectangle(0, -10, 56, 70, 0xffffff, 0.8).setStrokeStyle(2, 0x000000);
-        var seat = scene.add.rectangle(0, 25, 50, 20, 0x34495e);
-        var wheel1 = scene.add.rectangle(-32, -35, 12, 24, 0x2c3e50);
-        var wheel2 = scene.add.rectangle(32, -35, 12, 24, 0x2c3e50);
-        var wheel3 = scene.add.rectangle(-32, 35, 12, 24, 0x2c3e50);
-        var wheel4 = scene.add.rectangle(32, 35, 12, 24, 0x2c3e50);
-        sprite.add([wheel1, wheel2, wheel3, wheel4, base, seat, roof]);
+        var sprite = scene.add.dom(x, y).createFromHTML(`
+            <div class="cart-container">
+                <div class="cart-visual">
+                    <div class="cube cart-body">
+                        <div class="face front-bottom"></div><div class="face back"></div>
+                        <div class="face front"></div><div class="face back"></div>
+                        <div class="face left"></div><div class="face right"></div>
+                        <div class="face top"></div><div class="face bottom"></div>
+                    </div>
+                    <div class="cube wheel front-left">
+                        <div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div>
+                    </div>
+                    <div class="cube wheel front-right">
+                        <div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div>
+                    </div>
+                    <div class="cube wheel back-left">
+                        <div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div>
+                    </div>
+                    <div class="cube wheel back-right">
+                        <div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div>
+                    </div>
+                    <div class="cart-shadow"></div>
+                </div>
+            </div>
+        `);
+
+        // Set the cart color via CSS variable if provided
+        if (color) {
+            var hexColor = '#' + color.toString(16).padStart(6, '0');
+            sprite.node.querySelector('.cart-container').style.setProperty('--cart', hexColor);
+        }
 
         var cart = { body: body, sprite: sprite, ownerId: ownerId };
         state.golfCarts.push(cart);
@@ -57,10 +78,10 @@
         p.sprite.setAlpha(1);
         if (p.savedMask !== undefined) p.body.collisionFilter.mask = p.savedMask;
         p.body.isSensor = false;
-        if (p.savedMask !== undefined) p.body.collisionFilter.mask = p.savedMask;
-        p.body.isSensor = false;
         if (!p.isAI) state.game.scene.scenes[0].speedometer.classList.add('hidden');
-        var exitAngle = cart.body.angle + Math.PI / 2;
+
+        // Exit to the left side (PI offset from physics angle 0)
+        var exitAngle = cart.body.angle + Math.PI;
         state.game.scene.scenes[0].matter.body.setPosition(p.body, {
             x: cart.body.position.x + Math.cos(exitAngle) * 60,
             y: cart.body.position.y + Math.sin(exitAngle) * 60
@@ -94,7 +115,7 @@
         var terrainGripMult = terrain && terrain.cartGripMult !== undefined ? terrain.cartGripMult : 1.0;
         var terrainSpeedMult = terrain && terrain.cartMaxSpeedMult !== undefined ? terrain.cartMaxSpeedMult : 1.0;
 
-        var grip = 0.5 * terrainGripMult; // Reduce lateral sliding
+        var grip = 0.7 * terrainGripMult; // Reduce lateral sliding (increased from 0.5 for sharper turns)
 
         scene.matter.body.setVelocity(cart.body, {
             x: curVel.x - latVel * lx * grip,
@@ -111,15 +132,15 @@
             p.turboRamp = Math.max(0, p.turboRamp - 0.002 * dt);
         }
 
-        var baseMax = 7 * terrainSpeedMult;
+        var baseMax = 9 * terrainSpeedMult; // Increased from 7
         var turboBoost = 3.0 * terrainSpeedMult;
         var currentMax = baseMax + turboBoost * p.turboRamp;
 
-        var baseForce = 0.2 * terrainSpeedMult;
+        var baseForce = 0.25 * terrainSpeedMult; // Increased from 0.2
         var turboForceBoost = 0.008 * terrainSpeedMult;
         var force = (baseForce + turboForceBoost * p.turboRamp) * speedScale;
 
-        var torque = 2 * speedScale;
+        var torque = 3.5 * speedScale; // Increased from 2 for faster rotation
         var angle = cart.body.angle - Math.PI / 2;
 
         if (keys.W) {
@@ -130,8 +151,8 @@
         }
         if (keys.S) {
             scene.matter.body.applyForce(cart.body, cart.body.position, {
-                x: -Math.cos(angle) * (force * 0.3),
-                y: -Math.sin(angle) * (force * 0.3)
+                x: -Math.cos(angle) * (force * 0.6), // Increased from 0.3
+                y: -Math.sin(angle) * (force * 0.6)
             });
         }
 

@@ -1,0 +1,213 @@
+:root {
+    --cart: #2ecc71;
+    --roof: #ffffff;
+    --seat: #2c3e50;
+}
+
+.cart-container {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cart-visual {
+    transform-style: preserve-3d;
+    transform: rotateX(-35deg) rotateY(calc(0deg + var(--cart-rotate, 0deg)));
+    position: relative;
+    /* Scale removed to match physics 1:1 */
+    transition: transform 0.1s ease-out;
+}
+
+.cube {
+    position: absolute;
+    transform-style: preserve-3d;
+}
+
+.face {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* ============================= */
+/* MAIN BODY BOX - 60x40x160     */
+/* ============================= */
+
+.cart-body {
+    width: 60px;
+    height: 80px;
+    top: -20px;
+    left: -30px;
+}
+
+.cart-body .face {}
+
+.cart-body .front {
+    background-color: pink;
+    transform: translateZ(50px) rotateX(20deg);
+}
+
+.cart-body .front-bottom {
+    background: var(--cart);
+    transform: translateZ(60px) rotateX(0deg);
+    width: 60px;
+    height: 30px;
+    left: 0;
+    bottom: 30px;
+}
+
+.cart-body .back {
+    width: 60px;
+    height: 30px;
+    bottom: 30px;
+}
+
+.cart-body .front {
+    width: 60px;
+    height: 50px;
+    bottom: 60px;
+
+
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.cart-body .back {
+    transform: translateZ(-60px);
+    background: var(--cart);
+}
+
+.cart-body .left,
+.cart-body .right {
+    width: 120px;
+    height: 30px;
+    filter: brightness(0.85);
+    bottom: 30px;
+    background: var(--cart);
+}
+
+.cart-body .right {
+    transform: rotateY(90deg) translateZ(0px);
+}
+
+.cart-body .left {
+    transform: rotateY(-90deg) translateZ(60px);
+}
+
+.cart-body .top,
+.cart-body .bottom {
+    width: 60px;
+    height: 120px;
+    background: var(--cart);
+}
+
+.cart-body .top {
+    transform: rotateX(90deg) translateZ(80px) translateY(-10px);
+    filter: brightness(1.1);
+    height: 100px;
+}
+
+.cart-body .bottom {
+    transform: rotateX(-90deg) translateZ(-10px);
+    filter: brightness(0.5);
+}
+
+
+.cart-shadow {
+    transform: rotateY(90deg) rotateX(90deg);
+    position: absolute;
+    z-index: -1;
+    width: 120px;
+    height: 60px;
+    top: 0px;
+    left: -90px;
+    filter: blur(15px);
+    background: #222;
+}
+
+/* ============================= */
+/* WHEELS - 30x30x30            */
+/* ============================= */
+
+.wheel {
+    width: 20px;
+    height: 20px;
+}
+
+.wheel .face {
+    background: #222;
+}
+
+.wheel .front,
+.wheel .back,
+.wheel .top,
+.wheel .bottom {
+    width: 10px;
+    height: 20px;
+}
+
+
+.wheel .left,
+.wheel .right {
+    width: 20px;
+    height: 20px;
+}
+
+.wheel .front {
+    transform: translateZ(10px);
+}
+
+.wheel .back {
+    transform: rotateY(180deg) translateZ(10px);
+    filter: brightness(0.7);
+}
+
+.wheel .left {
+    transform: rotateY(-90deg) translateZ(10px);
+    filter: brightness(0.85);
+}
+
+.wheel .right {
+    transform: rotateY(90deg) translateZ(0px);
+    filter: brightness(0.85);
+}
+
+.wheel .top {
+    transform: rotateX(90deg) translateZ(10px);
+    filter: brightness(1.1);
+}
+
+.wheel .bottom {
+    transform: rotateX(-90deg) translateZ(10px);
+    filter: brightness(0.5);
+}
+
+/* Wheels on the outside of the 60px wide body */
+.wheel.front-left {
+    top: 15px;
+    left: -41px;
+    transform: translateZ(45px);
+}
+
+.wheel.front-right {
+    top: 15px;
+    left: 31px;
+    transform: translateZ(45px);
+}
+
+.wheel.back-left {
+    top: 15px;
+    left: -41px;
+    transform: translateZ(-45px);
+}
+
+.wheel.back-right {
+    top: 15px;
+    left: 31px;
+    transform: translateZ(-45px);
+}

@@ -139,6 +139,7 @@
                     // Sync Position
                     scene.matter.body.setPosition(localP.body, { x: data.x, y: data.y });
                     localP.flipX = data.flipX;
+                    if (data.direction) localP.direction = data.direction; // Sync direction
 
                     // Sync Ball Position
                     if (data.ballX !== undefined && data.ballY !== undefined) {
@@ -186,24 +187,70 @@
 
                     // Sync Visuals immediately (don't wait for main loop)
                     cart.sprite.setPosition(data.x, data.y);
-                    cart.sprite.setRotation(data.angle);
                 }
             });
 
             // Club Taken
             socket.on('clubTaken', function (data) {
-                console.log('Networking: Club Taken', data);
-                var type = Golf.removeClub(data.clubId); // Remove visual
+                console.log('[Networking] clubTaken event received:', data);
+                var type = Golf.removeClub(data.clubId); // Remove visual from map
 
                 // If I am the one who took it, add to my inventory
-                if (data.playerId === socket.id && type) {
-                    var myP = Golf.state.players[Golf.state.myPlayerId];
+                if (data.playerId === socket.id) {
+                    if (!type) {
+                        console.error('[Networking] clubTaken: Could not find club locally with ID:', data.clubId);
+                        return;
+                    }
+
+                    var myIdx = (Golf.state.myPlayerId !== null) ? Golf.state.myPlayerId : 0;
+                    var myP = Golf.state.players[myIdx];
+
                     if (myP) {
-                        myP.inventory.push(type);
-                        if (!myP.activeClub) myP.activeClub = type;
+                        if (data.swap && data.droppedType) {
+                            console.log('[Networking] Processing SWAP. Dropped type name:', data.droppedType.name);
+                            // Find and replace the dropped club in inventory
+                            var idx = myP.inventory.findIndex(function (c) {
+                                return c.name.toLowerCase() === data.droppedType.name.toLowerCase();
+                            });
+
+                            if (idx !== -1) {
+                                console.log('[Networking] Swapping inventory slot:', idx);
+                                myP.inventory[idx] = type;
+                                myP.activeClub = type;
+                            } else {
+                                console.warn('[Networking] Could not find dropped club in inventory by name, fallback to activeClub or slot 0');
+                                var activeIdx = myP.inventory.indexOf(myP.activeClub);
+                                if (activeIdx !== -1) {
+                                    myP.inventory[activeIdx] = type;
+                                } else {
+                                    myP.inventory[0] = type;
+                                }
+                                myP.activeClub = type;
+                            }
+                        } else {
+                            console.log('[Networking] Processing regular PICKUP');
+                            if (myP.inventory.length < 2) {
+                                myP.inventory.push(type);
+                                myP.activeClub = type; // Auto-equip on pickup
+                            } else {
+                                console.warn('[Networking] Inventory full, pickup ignored.');
+                            }
+                        }
                         Golf.updateClubUI(myP);
                     }
                 }
+            });
+
+            // Club Spawned (from swap)
+            socket.on('clubSpawned', function (club) {
+                console.log('[Networking] clubSpawned received:', club);
+                if (Golf.createClub) {
+                    Golf.createClub(sceneRef, club.x, club.y, club.type, club.id);
+                }
+            });
+
+            socket.on('debugMsg', function (msg) {
+                console.log('[Server Debug]', msg);
             });
 
             // Hole Sync
@@ -287,7 +334,9 @@
                 y: p.body.position.y,
                 ballX: p.ball ? p.ball.position.x : 0,
                 ballY: p.ball ? p.ball.position.y : 0,
+                ballY: p.ball ? p.ball.position.y : 0,
                 anim: p.state,
+                direction: p.direction, // Send direction for 3D facing
                 driving: p.driving ? true : null // Simplify
             };
             socket.emit('playerInput', data);
@@ -319,8 +368,27 @@
         },
 
         requestPickup: function (clubId) {
-            if (!socket) return;
+            if (!socket) {
+                console.error('[Networking] requestPickup: Socket not connected');
+                return;
+            }
+            console.log('[Networking] Emitting requestPickup for club:', clubId);
             socket.emit('requestPickup', clubId);
+        },
+
+        requestSwap: function (pickupClubId, droppedClubType, x, y) {
+            if (!socket) {
+                console.error('[Networking] requestSwap: Socket not connected');
+                return;
+            }
+            var name = droppedClubType && droppedClubType.name ? droppedClubType.name : 'Iron';
+            console.log('[Networking] Emitting requestSwap. Pickup:', pickupClubId, 'DropName:', name);
+            socket.emit('requestSwap', {
+                pickupClubId: pickupClubId,
+                droppedClubName: name, // Send name only for robustness
+                x: x,
+                y: y
+            });
         }
     };
 

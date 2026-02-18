@@ -4,7 +4,7 @@
     Golf.MAP_CONFIG = {
         rows: 0,
         cols: 0,
-        tileSize: 100
+        tileSize: 80
     };
 
     Golf.MAP_DATA = [];

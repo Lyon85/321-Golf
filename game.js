@@ -48,6 +48,8 @@ const CLUB_TYPES = {
 
 function preload() {
     console.log("Phaser: Preloading assets...");
+    // This tells Phaser: "Download this file and call it 'grass_texture'"
+    this.load.image('grass_texture', 'assets/grass_g1.jpg');
 }
 
 function create() {

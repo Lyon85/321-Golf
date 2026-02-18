@@ -10,7 +10,8 @@
 
         // Use provided pointer (remote) or scene active pointer (local)
         var activePointer = pointer || scene.input.activePointer;
-        var isMouseDown = activePointer.isDown;
+        var isMouseDown = activePointer.leftButtonDown();
+        var isRightDown = activePointer.rightButtonDown();
         var isLocal = !pointer;
 
         if (isMouseDown) {
@@ -49,31 +50,41 @@
             if (isLocal) scene.powerMeterFill.style.width = p.power + '%';
 
             var playerX = p.body.position.x;
-            var playerY = p.body.position.y;
+            var playerY = p.body.position.y - (Golf.getElevationAt(p.body.position.x, p.body.position.y)) + 20; // Aim from visual feet
             var mouseAngle = Phaser.Math.Angle.Between(
                 playerX,
                 playerY,
                 activePointer.worldX,
                 activePointer.worldY
             );
+            p.aimAngle = mouseAngle; // Store for visuals
 
-            // Only draw cone for local player
+            // Update direction to face the ball/aim point
+            var deg = Phaser.Math.RadToDeg(mouseAngle);
+            if (deg > -45 && deg <= 45) p.direction = Golf.DIRECTIONS.E;
+            else if (deg > 45 && deg <= 135) p.direction = Golf.DIRECTIONS.S;
+            else if (deg > 135 || deg <= -135) p.direction = Golf.DIRECTIONS.W;
+            else p.direction = Golf.DIRECTIONS.N;
+
+            // Only draw cone for local player if left or right click is held
             if (isLocal) {
                 state.hitConeGraphics.clear();
-                state.hitConeGraphics.fillStyle(0xffffff, 0.15);
-                state.hitConeGraphics.beginPath();
-                state.hitConeGraphics.moveTo(playerX, playerY);
-                state.hitConeGraphics.arc(
-                    playerX,
-                    playerY,
-                    MAX_HIT_DISTANCE,
-                    mouseAngle - Phaser.Math.DegToRad(CONE_ANGLE / 2),
-                    mouseAngle + Phaser.Math.DegToRad(CONE_ANGLE / 2)
-                );
-                state.hitConeGraphics.closePath();
-                state.hitConeGraphics.fill();
-                state.hitConeGraphics.lineStyle(2, 0xffffff, 0.3);
-                state.hitConeGraphics.strokePath();
+                if (isMouseDown || isRightDown) {
+                    state.hitConeGraphics.fillStyle(0xffffff, 0.15);
+                    state.hitConeGraphics.beginPath();
+                    state.hitConeGraphics.moveTo(playerX, playerY);
+                    state.hitConeGraphics.arc(
+                        playerX,
+                        playerY,
+                        MAX_HIT_DISTANCE,
+                        mouseAngle - Phaser.Math.DegToRad(CONE_ANGLE / 2),
+                        mouseAngle + Phaser.Math.DegToRad(CONE_ANGLE / 2)
+                    );
+                    state.hitConeGraphics.closePath();
+                    state.hitConeGraphics.fill();
+                    state.hitConeGraphics.lineStyle(2, 0xffffff, 0.3);
+                    state.hitConeGraphics.strokePath();
+                }
             }
 
             var ballDist = Phaser.Math.Distance.Between(
@@ -91,7 +102,7 @@
 
             if (isLocal) {
                 state.aimLine.clear();
-                if (isBallInCone) {
+                if (isBallInCone && isRightDown) {
                     var club = p.activeClub;
                     var distFactor = ballDist / MAX_HIT_DISTANCE;
                     var pwrMult = 1.0 - distFactor * 0.5;
@@ -112,7 +123,7 @@
             }
         } else if (p.isAiming) {
             playerX = p.body.position.x;
-            playerY = p.body.position.y;
+            playerY = p.body.position.y - (Golf.getElevationAt(p.body.position.x, p.body.position.y)) + 20; // Aim from visual feet
             ballDist = Phaser.Math.Distance.Between(
                 playerX, playerY,
                 p.ball.position.x, p.ball.position.y

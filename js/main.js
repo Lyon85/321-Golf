@@ -6,10 +6,25 @@
     function preload() {
         console.log('Phaser: Preloading assets...');
         this.load.spritesheet('player-sheet', Golf.ASSETS.PLAYER_SPRITESHEET, { frameWidth: 160, frameHeight: 160 });
+
+        // This tells Phaser: "Download this file and call it 'grass_texture'"
+        this.load.image('grass_g1_texture', 'assets/grass_g1.png');
+        this.load.image('grass_g2_texture', 'assets/grass_g2.png');
+        this.load.image('grass_g3_texture', 'assets/grass_g3.png');
+        this.load.image('mountain_m1_texture', 'assets/mountain_m1.png');
+        this.load.image('mountain_m2_texture', 'assets/mountain_m2.jpg');
+        this.load.image('water_w1_texture', 'assets/water_w1.jpg');
+        this.load.image('water_w2_texture', 'assets/water_w2.jpg');
+        this.load.image('water_w3_texture', 'assets/water_w3.jpg');
+        this.load.image('bunker_b1_texture', 'assets/sand.png');
+
     }
 
     function create() {
         var scene = this;
+
+        // Disable right-click context menu
+        this.input.mouse.disableContextMenu();
 
         // Define Animations for all 4 players
         for (var pIdx = 0; pIdx < 4; pIdx++) {
@@ -105,8 +120,8 @@
             console.error('[Main] Error creating hole:', err);
         }
 
-        state.aimLine = scene.add.graphics().setDepth(10);
-        state.hitConeGraphics = scene.add.graphics().setDepth(9);
+        state.aimLine = scene.add.graphics().setDepth(10000);
+        state.hitConeGraphics = scene.add.graphics().setDepth(10000);
 
         // Pick a random tee if not already set (e.g. by networking or host)
         if (!state.spawnPoint && state.teePositions && state.teePositions.length > 0) {
@@ -136,7 +151,7 @@
                 fontSize: '12px',
                 fill: '#ffffff',
                 backgroundColor: '#000000bb'
-            }).setOrigin(0.5).setDepth(200);
+            }).setOrigin(0.5).setDepth(11000);
         });
 
         // Camera will be set to follow the correct player after game starts
@@ -156,7 +171,7 @@
             })
             .setOrigin(0.5)
             .setAlpha(0)
-            .setDepth(100);
+            .setDepth(11000);
 
         scene.powerMeterContainer = document.getElementById('power-meter-container');
         scene.powerMeterFill = document.getElementById('power-meter-fill');
@@ -204,6 +219,22 @@
             Golf.Networking.sendPlayerInput(state.players[localPlayerIndex]);
         }
 
+        // --- ROBUST INPUT CHECK ---
+        var ePressed = Phaser.Input.Keyboard.JustDown(scene.keys.E);
+        if (ePressed && state.players[localPlayerIndex]) {
+            // Diagnostic: Show temporary text on screen to confirm key registration
+            var pPos = state.players[localPlayerIndex].body.position;
+            var diagText = scene.add.text(pPos.x, pPos.y - 120, 'E PRESSED!', {
+                family: 'Outfit',
+                fontSize: '24px',
+                fontStyle: 'bold',
+                color: '#00ff00',
+                backgroundColor: '#000000'
+            }).setOrigin(0.5).setDepth(1000);
+            scene.time.delayedCall(500, function () { diagText.destroy(); });
+            console.log('[Main] Diagnostic: E key state captured as TRUE');
+        }
+
 
         state.players.forEach(function (p, index) {
             // Handle local player input
@@ -212,42 +243,61 @@
             var isLocalPlayer = (state.myPlayerId === null && index === 0) || (index === state.myPlayerId);
 
             if (isLocalPlayer && !p.isAI) {
-                handleHumanInput(scene, p, delta);
+                Golf.handleHumanInput(scene, p, delta);
             }
 
-            // Update animations based on state
-            var animKey = '';
-            var flip = false;
-            var pIdx = p.playerIndex;
+            var pSprite = p.sprite;
 
+            // Handle DOM Character Visuals
+            // Handle DOM Character Visuals
+            var golferNode = pSprite.node.querySelector('#golfer');
+            if (golferNode) {
+                var targetRot = 0;
+                switch (p.direction) {
+                    case Golf.DIRECTIONS.N: targetRot = 135; break;
+                    case Golf.DIRECTIONS.NE: targetRot = 90; break;
+                    case Golf.DIRECTIONS.E: targetRot = 45; break;
+                    case Golf.DIRECTIONS.SE: targetRot = 0; break;
+                    case Golf.DIRECTIONS.S: targetRot = -45; break;
+                    case Golf.DIRECTIONS.SW: targetRot = -90; break;
+                    case Golf.DIRECTIONS.W: targetRot = -135; break;
+                    case Golf.DIRECTIONS.NW: targetRot = -180; break;
+                }
+
+                // Override if aiming
+                if (p.isAiming || p.swingState === Golf.SWING_STATES.BACKSWING) {
+                    var aimDeg = Phaser.Math.RadToDeg(p.aimAngle || 0);
+                    targetRot = 45 - aimDeg;
+                }
+
+                // Shortest-path rotation logic
+                if (p.currentVisualRotation === undefined) p.currentVisualRotation = targetRot;
+
+                var diff = targetRot - (p.currentVisualRotation % 360);
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+
+                p.currentVisualRotation += diff;
+                golferNode.style.setProperty('--dir-rotate', p.currentVisualRotation + 'deg');
+            }
+
+            // Animation State (Walking)
             if (p.state === Golf.PLAYER_STATES.WALKING || p.state === Golf.PLAYER_STATES.SWIMMING) {
-                if (p.direction.includes('N')) {
-                    animKey = 'walk_n_' + pIdx;
-                } else if (p.direction.includes('S')) {
-                    animKey = 'walk_s_' + pIdx;
-                } else {
-                    animKey = 'walk_h_' + pIdx;
-                }
-
-                // Handle flipping for horizontal
-                if (pIdx % 2 === 0) { // P1 and P3 are primarily Left walking
-                    if (p.direction.includes('E')) flip = true;
-                } else { // P2 and P4 are primarily Right walking
-                    if (p.direction.includes('W')) flip = true;
-                }
-            } else if (p.state === Golf.PLAYER_STATES.SWINGING) {
-                animKey = 'swing_' + pIdx;
+                pSprite.node.classList.add('walking');
             } else {
-                // Idle: Show first frame of Down animation
-                p.sprite.stop();
-                var rowStart = Math.floor(pIdx / 2) * 4;
-                var colStart = (pIdx % 2) * 4;
-                p.sprite.setFrame(rowStart * 8 + colStart + 16);
+                pSprite.node.classList.remove('walking');
             }
 
-            if (animKey) {
-                p.sprite.play(animKey, true);
-                p.sprite.setFlipX(flip);
+            // Swing Animation States
+            if (p.isAiming || p.swingState === Golf.SWING_STATES.BACKSWING) {
+                pSprite.node.classList.add('aiming');
+                pSprite.node.classList.remove('swinging');
+            } else if (p.swingState === Golf.SWING_STATES.HIT) {
+                pSprite.node.classList.remove('aiming');
+                pSprite.node.classList.add('swinging');
+            } else {
+                pSprite.node.classList.remove('aiming');
+                pSprite.node.classList.remove('swinging');
             }
 
             // Submerged visual for swimming, or hidden if driving
@@ -257,20 +307,29 @@
                 p.sprite.setAlpha(p.state === Golf.PLAYER_STATES.SWIMMING ? 0.6 : 1.0);
             }
 
-            p.sprite.setPosition(p.body.position.x, p.body.position.y);
+            var pElevation = Golf.getElevationAt(p.body.position.x, p.body.position.y);
+            // pVisualY: position the sprite so the character's FEET land at (body.y - elevation).
+            // The CSS character's feet are 45px below the DOM element's origin (legs: top 60→180px × scale 0.25).
+            var PLAYER_FEET_OFFSET = 45;
+            var pVisualY = p.body.position.y - pElevation - PLAYER_FEET_OFFSET;
+            p.sprite.setPosition(p.body.position.x, pVisualY);
+            p.sprite.setDepth(p.body.position.y - pElevation + 20);
 
             // Update debug text
             var debugInfo = p.state + " (" + p.direction + ")";
             if (p.state === "SWINGING") debugInfo += "\n" + p.swingState;
             p.debugText.setText(debugInfo);
-            p.debugText.setPosition(p.body.position.x, p.body.position.y + 40);
+            p.debugText.setPosition(p.body.position.x, p.body.position.y - pElevation + 10);
 
-            p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y - p.ballHeight);
+            var bElevation = Golf.getElevationAt(p.ball.position.x, p.ball.position.y);
+            p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y - p.ballHeight - bElevation);
             p.ballSprite.setScale(1 + p.ballHeight / 20);
+            p.ballSprite.setDepth(p.ball.position.y - bElevation);
 
-            p.ballShadow.setPosition(p.ball.position.x, p.ball.position.y);
-            p.ballShadow.setVisible(p.ballHeight > 0);
+            p.ballShadow.setPosition(p.ball.position.x, p.ball.position.y - bElevation);
+            p.ballShadow.setVisible(p.ballHeight > 0 || bElevation !== 0);
             p.ballShadow.setScale(1 - p.ballHeight / 100);
+            p.ballShadow.setDepth(p.ball.position.y - bElevation - 0.1);
 
             var bSpeed = Math.sqrt(p.ball.velocity.x * p.ball.velocity.x + p.ball.velocity.y * p.ball.velocity.y);
 
@@ -293,16 +352,42 @@
             // --- Terrain Physics (Friction & Slopes) ---
             if (bSpeed > 0.01) {
                 if (p.ballHeight <= 2) {
-                    // Apply Terrain Friction
-                    p.ball.frictionAir = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y);
+                    // Determine terrain under the ball.
+                    // NOTE: many bunker tiles are encoded as "b..." with incline/direction modifiers,
+                    // which change tile.type to "incline". Use baseToken so bunkers are still detected.
+                    var tile = Golf.getTileAt(p.ball.position.x, p.ball.position.y);
+                    var isBunker =
+                        tile &&
+                        (
+                            tile.type === 'bunker' ||
+                            (tile.baseToken && String(tile.baseToken).charAt(0) === 'b')
+                        );
 
-                    // Apply Slopes
-                    var slopeForce = Golf.getSlopeAt(p.ball.position.x, p.ball.position.y);
-                    if (slopeForce.x !== 0 || slopeForce.y !== 0) {
-                        scene.matter.body.applyForce(p.ball, p.ball.position, {
-                            x: slopeForce.x * p.ball.mass,
-                            y: slopeForce.y * p.ball.mass
-                        });
+                    if (isBunker) {
+                        // In bunkers: very high drag and no slope forces.
+                        // This keeps the motion mostly one-way from the hit,
+                        // then lets the ball roll just a short distance before stopping.
+                        var bunkerFriction = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y) * 3;
+                        p.ball.frictionAir = bunkerFriction;
+
+                        // Once the ball is almost stopped in sand, snap it fully to rest.
+                        if (bSpeed < 0.2) {
+                            scene.matter.body.setVelocity(p.ball, { x: 0, y: 0 });
+                            bSpeed = 0;
+                        }
+                    } else {
+                        // Normal terrain behaviour
+                        var baseFriction = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y);
+                        p.ball.frictionAir = baseFriction;
+
+                        // Apply Slopes
+                        var slopeForce = Golf.getSlopeAt(p.ball.position.x, p.ball.position.y);
+                        if (slopeForce.x !== 0 || slopeForce.y !== 0) {
+                            scene.matter.body.applyForce(p.ball, p.ball.position, {
+                                x: slopeForce.x * p.ball.mass,
+                                y: slopeForce.y * p.ball.mass
+                            });
+                        }
                     }
                 } else {
                     // Reset to default friction in air
@@ -313,80 +398,128 @@
 
             p.trail.emitting = bSpeed > 2;
 
-            if (p.inventory.length < 2) {
-                state.clubs.forEach(function (c, i) {
-                    if (
-                        c.sprite.visible &&
-                        !c.tempTaken && // Avoid spamming
-                        Phaser.Math.Distance.Between(
-                            p.body.position.x, p.body.position.y,
-                            c.x, c.y
-                        ) < 60
-                    ) {
-                        // Request pickup from server
-                        if (Golf.Networking && c.id !== undefined) {
-                            Golf.Networking.requestPickup(c.id);
-                            c.tempTaken = true; // Local Debounce
-                        }
-                    }
-                });
-            }
-
-            if (!p.isAI && p.inventory.length >= 1) {
-                if (Phaser.Input.Keyboard.JustDown(scene.keys.ONE) && p.inventory[0]) {
-                    p.activeClub = p.inventory[0];
-                    Golf.updateClubUI(p);
-                } else if (Phaser.Input.Keyboard.JustDown(scene.keys.TWO) && p.inventory[1]) {
-                    p.activeClub = p.inventory[1];
-                    Golf.updateClubUI(p);
-                }
-            }
-
             if (isLocalPlayer && !p.isAI) {
-                var nearCart = null;
-                state.golfCarts.forEach(function (cart) {
-                    var dist = Phaser.Math.Distance.Between(
-                        p.body.position.x, p.body.position.y,
-                        cart.body.position.x, cart.body.position.y
-                    );
-                    if (dist < 80) nearCart = cart;
+                // Find nearest interaction target
+                var nearestClub = null;
+                var minDistClubs = 100; // Increased search radius for logging
+                state.clubs.forEach(function (c) {
+                    var d = Phaser.Math.Distance.Between(p.body.position.x, p.body.position.y, c.x, c.y);
+                    if (d < minDistClubs) {
+                        nearestClub = c;
+                        minDistClubs = d;
+                    }
                 });
 
-                if (nearCart && !p.driving) {
-                    scene.interactionText
-                        .setPosition(p.body.position.x, p.body.position.y - 60)
-                        .setText('Press E to Drive')
-                        .setAlpha(1);
-                    if (Phaser.Input.Keyboard.JustDown(scene.keys.E)) {
-                        Golf.enterCart(p, nearCart);
+                var interactionTarget = (minDistClubs <= 75) ? nearestClub : null;
+
+                var nearestCart = null;
+                var minDistCarts = 100;
+                state.golfCarts.forEach(function (cart) {
+                    var d = Phaser.Math.Distance.Between(p.body.position.x, p.body.position.y, cart.body.position.x, cart.body.position.y);
+                    if (d < minDistCarts) {
+                        nearestCart = cart;
+                        minDistCarts = d;
                     }
-                } else if (p.driving) {
+                });
+
+                var cartTarget = (minDistCarts <= 80) ? nearestCart : null;
+
+                // Interaction Logic
+                if (p.driving) {
                     scene.interactionText
                         .setPosition(p.body.position.x, p.body.position.y - 60)
                         .setText('Press E to Exit')
                         .setAlpha(1);
-                    if (Phaser.Input.Keyboard.JustDown(scene.keys.E)) {
+                    if (ePressed) {
+                        console.log('[Main] Interaction: E pressed to Exit Cart');
                         Golf.exitCart(p);
+                    }
+                } else if (interactionTarget) {
+                    var isSwap = p.inventory.length >= 2;
+                    var label = isSwap ? 'Swap with ' : 'Pick up ';
+                    scene.interactionText
+                        .setPosition(p.body.position.x, p.body.position.y - 60)
+                        .setText('Press E to ' + label + interactionTarget.type.name)
+                        .setAlpha(1);
+
+                    if (ePressed) {
+                        console.log('[Main] Interaction: E pressed for club:', interactionTarget.id, 'Swap State:', isSwap, 'Current Inv:', p.inventory.map(c => c.name));
+                        if (isSwap) {
+                            var droppedClub = p.activeClub || p.inventory[0];
+                            console.log('[Main] Swapping out equipped club:', droppedClub.name);
+                            if (Golf.Networking && state.myPlayerId !== null) {
+                                Golf.Networking.requestSwap(interactionTarget.id, droppedClub, p.body.position.x, p.body.position.y);
+                            } else {
+                                // Local Fallback
+                                console.log('[Main] Local Swap Fallback');
+                                var idx = p.inventory.findIndex(function (c) { return c.name.toLowerCase() === droppedClub.name.toLowerCase(); });
+                                if (idx === -1) idx = 0;
+                                p.inventory[idx] = interactionTarget.type;
+                                p.activeClub = interactionTarget.type;
+                                Golf.removeClub(interactionTarget.id);
+                                Golf.createClub(scene, p.body.position.x, p.body.position.y, droppedClub, 'local_d_' + Date.now());
+                                Golf.updateClubUI(p);
+                            }
+                        } else {
+                            if (Golf.Networking && state.myPlayerId !== null) {
+                                console.log('[Main] Networking Pickup Request');
+                                Golf.Networking.requestPickup(interactionTarget.id);
+                            } else {
+                                // Local Fallback
+                                console.log('[Main] Local Pickup Fallback');
+                                p.inventory.push(interactionTarget.type);
+                                p.activeClub = interactionTarget.type; // Auto-equip
+                                Golf.removeClub(interactionTarget.id);
+                                Golf.updateClubUI(p);
+                            }
+                        }
+                    }
+                } else if (cartTarget) {
+                    scene.interactionText
+                        .setPosition(p.body.position.x, p.body.position.y - 60)
+                        .setText('Press E to Drive')
+                        .setAlpha(1);
+                    if (ePressed) {
+                        console.log('[Main] Interaction: E pressed to Enter Cart');
+                        Golf.enterCart(p, cartTarget);
                     }
                 } else {
                     scene.interactionText.setAlpha(0);
+                }
+
+                // Club Switching
+                if (p.inventory.length >= 1) {
+                    if (Phaser.Input.Keyboard.JustDown(scene.keys.ONE) && p.inventory[0]) {
+                        p.activeClub = p.inventory[0];
+                        Golf.updateClubUI(p);
+                    } else if (Phaser.Input.Keyboard.JustDown(scene.keys.TWO) && p.inventory[1]) {
+                        p.activeClub = p.inventory[1];
+                        Golf.updateClubUI(p);
+                    }
                 }
             }
 
 
             if (p.driving) {
-                p.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y);
+                var cartElev = Golf.getElevationAt(p.driving.body.position.x, p.driving.body.position.y);
+                p.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y - cartElev - PLAYER_FEET_OFFSET);
                 scene.matter.body.setPosition(p.body, p.driving.body.position);
-                p.driving.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y);
-                p.driving.sprite.setRotation(p.driving.body.angle);
+                // Position and Rotation of the cart sprite are handled in the separate golfCarts loop to avoid redundancy
             }
 
         });
 
         // Update Carts (Moved outside player loop)
         state.golfCarts.forEach(function (cart, index) {
-            cart.sprite.setPosition(cart.body.position.x, cart.body.position.y);
-            cart.sprite.setRotation(cart.body.angle);
+            var cartElevation = Golf.getElevationAt(cart.body.position.x, cart.body.position.y);
+            cart.sprite.setPosition(cart.body.position.x, cart.body.position.y - cartElevation);
+            cart.sprite.setDepth(cart.body.position.y + 40);
+            // Sync rotation via CSS variable
+            var angleDeg = Phaser.Math.RadToDeg(cart.body.angle);
+            // Invert the rotation direction and use 180 deg offset to match physics
+            // (North is 0 in physics, and 180 in CSS rotateY for this model)
+            var snappedAngle = 180 - (Math.round(angleDeg / 6) * 6);
+            cart.sprite.node.querySelector('.cart-visual').style.setProperty('--cart-rotate', snappedAngle + 'deg');
 
             // If local player is driving this cart, send update
             var localP = state.players[localPlayerIndex];
@@ -446,6 +579,9 @@
         width: window.innerWidth,
         height: window.innerHeight,
         parent: 'game-container',
+        dom: {
+            createContainer: true
+        },
 
         fps: {
             target: 60,

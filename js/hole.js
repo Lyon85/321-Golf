@@ -4,7 +4,7 @@
     var CAT_HOLE = Golf.CAT_HOLE;
     var CAT_BALL = Golf.CAT_BALL;
 
-    var HOLE_RADIUS = 45;
+    var HOLE_RADIUS = 15;
 
     function createHoleArrow(scene) {
         var arrowSize = 24;
@@ -20,7 +20,7 @@
         arrowG.fillPath();
         arrowG.strokePath();
         arrowG.generateTexture('holeArrow', arrowSize * 2.5, arrowSize * 2.5);
-        state.holeArrow = scene.add.image(0, 0, 'holeArrow').setScrollFactor(0).setDepth(100);
+        state.holeArrow = scene.add.image(0, 0, 'holeArrow').setScrollFactor(0).setDepth(11000);
     }
 
     Golf.createHole = function (scene) {
@@ -70,7 +70,7 @@
                     }
 
                     var bSpeed = Math.sqrt(ballBody.velocity.x * ballBody.velocity.x + ballBody.velocity.y * ballBody.velocity.y);
-                    if (bSpeed > 10) continue;
+                    if (bSpeed > 3) continue;
 
                     var player = state.players.find(function (p) { return p.ball === ballBody; });
                     if (player && player.ballHeight < 5) {
@@ -133,6 +133,7 @@
         }
 
         state.hole.setPosition(hx, hy);
+        state.hole.setDepth(hy);
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
@@ -156,7 +157,8 @@
         var ny = dy / dist;
         state.holeArrow.setPosition(cam.width / 2 + nx * edgeDist, cam.height / 2 + ny * edgeDist);
         state.holeArrow.setRotation(Math.atan2(ny, nx) + Math.PI / 2);
-        state.holeArrow.setVisible(dist > 80);
+        var isRightDown = scene.input.activePointer.rightButtonDown();
+        state.holeArrow.setVisible(dist > 80 && isRightDown);
     };
 
     Golf.syncHoleSunk = function (scene, newIndex) {
@@ -197,13 +199,28 @@
 
         console.log("Golf.onBallSunk triggered for P" + p.playerIndex);
 
-        // Multiplayer: Tell server someone sunk it.
-        if (Golf.Networking && Golf.Networking.sendHoleSunk && state.myPlayerId !== null) {
-            console.log("Multiplayer: Sending holeSunk to server...");
-            Golf.Networking.sendHoleSunk();
-        } else {
-            console.log("Singleplayer: Advancing hole locally...");
-            Golf.syncHoleSunk(scene, state.currentHoleIndex + 1);
-        }
+        // --- Visual Sinking Effect ---
+        // Hide ball and shadow immediately
+        if (p.ballSprite) p.ballSprite.setVisible(false);
+        if (p.ballShadow) p.ballShadow.setVisible(false);
+
+        // Snap physics body to hole center
+        scene.matter.body.setPosition(p.ball, { x: state.hole.x, y: state.hole.y });
+        scene.matter.body.setVelocity(p.ball, { x: 0, y: 0 });
+
+        // Wait a bit, then reappear (and sync)
+        scene.time.delayedCall(800, function () {
+            if (p.ballSprite) p.ballSprite.setVisible(true);
+            // Shadow visibility is handled in update loop based on height/elevation
+
+            // Multiplayer: Tell server someone sunk it.
+            if (Golf.Networking && Golf.Networking.sendHoleSunk && state.myPlayerId !== null) {
+                console.log("Multiplayer: Sending holeSunk to server...");
+                Golf.Networking.sendHoleSunk();
+            } else {
+                console.log("Singleplayer: Advancing hole locally...");
+                Golf.syncHoleSunk(scene, state.currentHoleIndex + 1);
+            }
+        });
     };
 })(typeof window !== 'undefined' ? window : this);
