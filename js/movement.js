@@ -12,7 +12,8 @@
             W: scene.keys.W.isDown,
             A: scene.keys.A.isDown,
             S: scene.keys.S.isDown,
-            D: scene.keys.D.isDown
+            D: scene.keys.D.isDown,
+            SPACE: scene.keys.SPACE.isDown
         };
 
         // Base movement speed (physics units per step)
@@ -81,6 +82,26 @@
             x: moveX * speedCap,
             y: moveY * speedCap
         });
+
+        // --- Jump Physics ---
+        var JUMP_FORCE = 7;
+        var GRAVITY = 0.5;
+
+        // Jump Input
+        if (keys.SPACE && p.z <= 0) {
+            p.vz = JUMP_FORCE;
+        }
+
+        // Apply Gravity
+        if (p.z > 0 || p.vz !== 0) {
+            p.vz -= GRAVITY;
+            p.z += p.vz;
+
+            if (p.z < 0) {
+                p.z = 0;
+                p.vz = 0;
+            }
+        }
     };
 
     /**

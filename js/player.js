@@ -131,7 +131,9 @@
       state: Golf.PLAYER_STATES.IDLE,
       direction: Golf.DIRECTIONS.S,
       swingState: Golf.SWING_STATES.NONE,
-      playerIndex: playerIndex || 0
+      playerIndex: playerIndex || 0,
+      z: 0,
+      vz: 0
     };
   };
 

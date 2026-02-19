@@ -14,7 +14,7 @@
 
 .cart-visual {
     transform-style: preserve-3d;
-    transform: rotateX(-35deg) rotateY(calc(0deg + var(--cart-rotate, 0deg)));
+    transform: rotateX(-35deg) rotateY(calc(0deg + var(--cart-rotate, 0deg))) translateZ(-45px);
     position: relative;
     /* Scale removed to match physics 1:1 */
     transition: transform 0.1s ease-out;
@@ -42,7 +42,7 @@
     left: -30px;
 }
 
-.cart-body .face {}
+
 
 .cart-body .front {
     background-color: pink;

@@ -311,7 +311,7 @@
             // pVisualY: position the sprite so the character's FEET land at (body.y - elevation).
             // The CSS character's feet are 45px below the DOM element's origin (legs: top 60→180px × scale 0.25).
             var PLAYER_FEET_OFFSET = 45;
-            var pVisualY = p.body.position.y - pElevation - PLAYER_FEET_OFFSET;
+            var pVisualY = p.body.position.y - pElevation - (p.z || 0) - PLAYER_FEET_OFFSET;
             p.sprite.setPosition(p.body.position.x, pVisualY);
             p.sprite.setDepth(p.body.position.y - pElevation + 20);
 
@@ -561,6 +561,7 @@
             }
 
             var cartElevation = Golf.getElevationAt(cart.body.position.x, cart.body.position.y);
+            // Offset sprite by -60 to match the physics body shift (Pivot is at rear, Center is -60)
             cart.sprite.setPosition(cart.body.position.x, cart.body.position.y - cartElevation);
             cart.sprite.setDepth(cart.body.position.y + 40);
 
@@ -675,7 +676,7 @@
             default: 'matter',
             matter: {
                 gravity: { y: 0 },
-                debug: false,
+                debug: true,
                 timing: {
                     fixedDelta: 1000 / 60
                 }

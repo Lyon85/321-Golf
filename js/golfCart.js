@@ -8,7 +8,7 @@
     var CAT_CAR = Golf.CAT_CAR;
 
     Golf.createGolfCart = function (scene, x, y, color, ownerId) {
-        var body = scene.matter.add.rectangle(x, y, 60, 160, {
+        var body = scene.matter.add.rectangle(x, y, 60, 120, {
             chamfer: { radius: 10 },
             friction: 0.5,
             frictionAir: 0.03,
@@ -21,6 +21,11 @@
                 mask: CAT_BUILDING | CAT_PLAYER | CAT_BALL | CAT_DEFAULT | CAT_CAR | Golf.CAT_TERRAIN | Golf.CAT_DEEP_WATER
             }
         });
+
+        // SHIFT PIVOT TO FRONT AXLE
+        // Hitbox is 120 long.
+        // Shift -45 puts pivot at 15px from the front.
+        scene.matter.body.setCentre(body, { x: 0, y: -45 }, true);
 
         var sprite = scene.add.dom(x, y).createFromHTML(`
             <div class="cart-container">
@@ -60,9 +65,12 @@
     };
 
     Golf.enterCart = function (p, cart) {
-        if (cart.ownerId !== undefined && cart.ownerId !== p.playerIndex) return;
+        // Prevent entering if someone else is already driving this cart
+        if (cart.driver && cart.driver !== p) return;
 
         p.driving = cart;
+        cart.driver = p; // Mark cart as occupied by this player
+
         p.sprite.setVisible(false); // Hide sprite to prevent jitter/ghosting
         p.sprite.setAlpha(0);
         p.savedMask = p.body.collisionFilter.mask;
@@ -73,6 +81,7 @@
 
     Golf.exitCart = function (p) {
         var cart = p.driving;
+        if (cart) cart.driver = null; // Release occupancy
         p.driving = null;
         p.sprite.setVisible(true); // Show sprite again
         p.sprite.setAlpha(1);

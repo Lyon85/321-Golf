@@ -150,19 +150,33 @@
 
                     // Sync Driving State (Enforce Physics/Sensor state)
                     if (data.driving) {
+                        var targetCartIdx = (data.drivingCartIndex !== undefined && data.drivingCartIndex !== -1)
+                            ? data.drivingCartIndex
+                            : localP.playerIndex;
+
+                        var targetCart = Golf.state.golfCarts[targetCartIdx];
+
+                        if (localP.driving && localP.driving !== targetCart) {
+                            // Player is driving the WRONG cart (e.g. from fallback or previous state)
+                            // Force exit old cart to clear occupancy
+                            console.log('[Networking] Correcting cart occupancy. Switching from',
+                                Golf.state.golfCarts.indexOf(localP.driving), 'to', targetCartIdx);
+                            Golf.exitCart(localP);
+                        }
+
                         if (!localP.driving) {
                             // Player should be in cart but isn't. Force enter.
-                            // Assuming Player N owns Cart N
-                            var cart = Golf.state.golfCarts[localP.playerIndex];
-                            if (cart) {
-                                console.log('[Networking] Remote player entering cart:', localP.playerIndex);
-                                Golf.enterCart(localP, cart);
+                            if (targetCart) {
+                                // Double-check occupancy before forcing (though Authoritative client won't send if blocked)
+                                // But here we just mirror visual state.
+                                console.log('[Networking] Remote player entering cart:', targetCartIdx);
+                                Golf.enterCart(localP, targetCart);
                             }
                         }
                     } else {
                         if (localP.driving) {
                             // Player should not be in cart but is. Force exit.
-                            console.log('[Networking] Remote player exiting cart:', localP.playerIndex);
+                            console.log('[Networking] Remote player exiting cart');
                             Golf.exitCart(localP);
                         }
                     }
@@ -349,7 +363,8 @@
                 ballY: p.ball ? p.ball.position.y : 0,
                 anim: p.state,
                 direction: p.direction, // Send direction for 3D facing
-                driving: p.driving ? true : null // Simplify
+                driving: p.driving ? true : null, // Simplify
+                drivingCartIndex: (p.driving && Golf.state.golfCarts) ? Golf.state.golfCarts.indexOf(p.driving) : -1
             };
             socket.emit('playerInput', data);
         },
