@@ -78,8 +78,15 @@
         var worldHeight = config.rows * config.tileSize;
 
         state.game = scene.game;
+        // Physics bounds stay top-down
         scene.matter.world.setBounds(0, 0, worldWidth, worldHeight);
-        scene.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+
+        // Camera bounds match isometric screen space
+        // minX: -worldHeight, maxX: worldWidth, width: worldWidth + worldHeight
+        // minY: 0, maxY: (worldWidth + worldHeight) / 2
+        var isoWidth = worldWidth + worldHeight;
+        var isoHeight = (worldWidth + worldHeight) / 2;
+        scene.cameras.main.setBounds(-worldHeight, 0, isoWidth, isoHeight);
 
 
 
@@ -122,6 +129,7 @@
 
         state.aimLine = scene.add.graphics().setDepth(10000);
         state.hitConeGraphics = scene.add.graphics().setDepth(10000);
+        state.debugGraphics = scene.add.graphics().setDepth(12000);
 
         // Pick a random tee if not already set (e.g. by networking or host)
         if (!state.spawnPoint && state.teePositions && state.teePositions.length > 0) {
@@ -153,6 +161,8 @@
                 backgroundColor: '#000000bb'
             }).setOrigin(0.5).setDepth(11000);
         });
+
+        state.showDebug = true;
 
         // Camera will be set to follow the correct player after game starts
         // Either by networking.js (multiplayer) or by triggerStart (single-player)
@@ -236,6 +246,7 @@
         }
 
 
+
         state.players.forEach(function (p, index) {
             // Handle local player input
             // In single-player: control player 0
@@ -309,27 +320,40 @@
 
             var pElevation = Golf.getElevationAt(p.body.position.x, p.body.position.y);
             // pVisualY: position the sprite so the character's FEET land at (body.y - elevation).
-            // The CSS character's feet are 45px below the DOM element's origin (legs: top 60→180px × scale 0.25).
             var PLAYER_FEET_OFFSET = 45;
-            var pVisualY = p.body.position.y - pElevation - (p.z || 0) - PLAYER_FEET_OFFSET;
-            p.sprite.setPosition(p.body.position.x, pVisualY);
-            p.sprite.setDepth(p.body.position.y - pElevation + 20);
+
+            var pIso = Golf.toIsometric(p.body.position.x, p.body.position.y);
+            var pVisualY = pIso.y - pElevation - (p.z || 0) - PLAYER_FEET_OFFSET;
+
+            p.sprite.setPosition(pIso.x, pVisualY);
+            // Depth in isometric is based on x + y
+            p.sprite.setDepth(p.body.position.x + p.body.position.y - pElevation + 20);
+
+            // Update Shadow Variables
+            // Use -8 to make the shadow move DOWNWARDS as the player jumps UPWARDS.
+            // (Previous positive value moved it up faster).
+            var shadowZ = (p.z || 0) * -8;
+            var shadowScale = 1 + (p.z || 0) / 100; // Increase size as player goes higher
+            p.sprite.node.style.setProperty('--shadow-z', shadowZ + 'px');
+            p.sprite.node.style.setProperty('--shadow-scale', shadowScale);
 
             // Update debug text
             var debugInfo = p.state + " (" + p.direction + ")";
             if (p.state === "SWINGING") debugInfo += "\n" + p.swingState;
             p.debugText.setText(debugInfo);
-            p.debugText.setPosition(p.body.position.x, p.body.position.y - pElevation + 10);
+            p.debugText.setPosition(pIso.x, pIso.y - pElevation + 10);
 
             var bElevation = Golf.getElevationAt(p.ball.position.x, p.ball.position.y);
-            p.ballSprite.setPosition(p.ball.position.x, p.ball.position.y - p.ballHeight - bElevation);
-            p.ballSprite.setScale(1 + p.ballHeight / 20);
-            p.ballSprite.setDepth(p.ball.position.y - bElevation);
+            var bIso = Golf.toIsometric(p.ball.position.x, p.ball.position.y);
 
-            p.ballShadow.setPosition(p.ball.position.x, p.ball.position.y - bElevation);
+            p.ballSprite.setPosition(bIso.x, bIso.y - p.ballHeight - bElevation);
+            p.ballSprite.setScale(1 + p.ballHeight / 20);
+            p.ballSprite.setDepth(p.ball.position.x + p.ball.position.y - bElevation);
+
+            p.ballShadow.setPosition(bIso.x, bIso.y - bElevation);
             p.ballShadow.setVisible(p.ballHeight > 0 || bElevation !== 0);
             p.ballShadow.setScale(1 - p.ballHeight / 100);
-            p.ballShadow.setDepth(p.ball.position.y - bElevation - 0.1);
+            p.ballShadow.setDepth(p.ball.position.x + p.ball.position.y - bElevation - 0.1);
 
             var bSpeed = Math.sqrt(p.ball.velocity.x * p.ball.velocity.x + p.ball.velocity.y * p.ball.velocity.y);
 
@@ -422,12 +446,16 @@
                     }
                 });
 
+
+
+
                 var cartTarget = (minDistCarts <= 80) ? nearestCart : null;
 
                 // Interaction Logic
                 if (p.driving) {
+                    var pIso = Golf.toIsometric(p.body.position.x, p.body.position.y);
                     scene.interactionText
-                        .setPosition(p.body.position.x, p.body.position.y - 60)
+                        .setPosition(pIso.x, pIso.y - 60)
                         .setText('Press E to Exit')
                         .setAlpha(1);
                     if (ePressed) {
@@ -437,8 +465,9 @@
                 } else if (interactionTarget) {
                     var isSwap = p.inventory.length >= 2;
                     var label = isSwap ? 'Swap with ' : 'Pick up ';
+                    var pIso = Golf.toIsometric(p.body.position.x, p.body.position.y);
                     scene.interactionText
-                        .setPosition(p.body.position.x, p.body.position.y - 60)
+                        .setPosition(pIso.x, pIso.y - 60)
                         .setText('Press E to ' + label + interactionTarget.type.name)
                         .setAlpha(1);
 
@@ -475,8 +504,9 @@
                         }
                     }
                 } else if (cartTarget) {
+                    var pIso = Golf.toIsometric(p.body.position.x, p.body.position.y);
                     scene.interactionText
-                        .setPosition(p.body.position.x, p.body.position.y - 60)
+                        .setPosition(pIso.x, pIso.y - 60)
                         .setText('Press E to Drive')
                         .setAlpha(1);
                     if (ePressed) {
@@ -502,7 +532,8 @@
 
             if (p.driving) {
                 var cartElev = Golf.getElevationAt(p.driving.body.position.x, p.driving.body.position.y);
-                p.sprite.setPosition(p.driving.body.position.x, p.driving.body.position.y - cartElev - PLAYER_FEET_OFFSET);
+                var cartIso = Golf.toIsometric(p.driving.body.position.x, p.driving.body.position.y);
+                p.sprite.setPosition(cartIso.x, cartIso.y - cartElev - PLAYER_FEET_OFFSET);
                 scene.matter.body.setPosition(p.body, p.driving.body.position);
                 // Position and Rotation of the cart sprite are handled in the separate golfCarts loop to avoid redundancy
             }
@@ -562,14 +593,16 @@
 
             var cartElevation = Golf.getElevationAt(cart.body.position.x, cart.body.position.y);
             // Offset sprite by -60 to match the physics body shift (Pivot is at rear, Center is -60)
-            cart.sprite.setPosition(cart.body.position.x, cart.body.position.y - cartElevation);
-            cart.sprite.setDepth(cart.body.position.y + 40);
+            var cartIso = Golf.toIsometric(cart.body.position.x, cart.body.position.y);
+            cart.sprite.setPosition(cartIso.x, cartIso.y - cartElevation);
+            cart.sprite.setDepth(cart.body.position.x + cart.body.position.y + 40);
 
             // Sync rotation via CSS variable
             var angleDeg = Phaser.Math.RadToDeg(cart.body.angle);
             // Invert the rotation direction and use 180 deg offset to match physics
             // (North is 0 in physics, and 180 in CSS rotateY for this model)
-            var snappedAngle = 180 - (Math.round(angleDeg / 6) * 6);
+            // Offset visual rotation by 45 degrees clockwise (180 - 45) to match isometric alignment
+            var snappedAngle = 135 - (Math.round(angleDeg / 6) * 6);
             cart.sprite.node.querySelector('.cart-visual').style.setProperty('--cart-rotate', snappedAngle + 'deg');
 
             // --- Sticky Pushing Logic ---
@@ -612,8 +645,75 @@
             }
         });
 
+        // --- UPDATE CLUBS (Isometric Projection + Floating Animation) ---
+        state.clubs.forEach(function (c) {
+            var cElev = Golf.getElevationAt(c.x, c.y);
+            var cIso = Golf.toIsometric(c.x, c.y);
+
+            // Add a shared floating effect synced to time
+            var floatY = Math.sin(scene.time.now / 400 + (c.x + c.y) * 0.1) * 8;
+
+            if (c.sprite) {
+                c.sprite.setPosition(cIso.x, cIso.y - cElev - 15 + floatY);
+                c.sprite.setDepth(c.x + c.y - cElev + 5);
+            }
+            if (c.txt) {
+                c.txt.setPosition(cIso.x, cIso.y - cElev - 15 + floatY);
+                c.txt.setDepth(c.x + c.y - cElev + 6);
+            }
+        });
+
+        // --- DEBUG RENDERING ---
+        if (state.showDebug) {
+            Golf.renderIsometricDebug(scene);
+        }
 
     }
+
+    Golf.renderIsometricDebug = function (scene) {
+        var g = state.debugGraphics;
+        g.clear();
+        g.lineStyle(1, 0x00ff00, 0.5);
+
+        var cam = scene.cameras.main;
+        var pad = Golf.MAP_CONFIG.tileSize * 2;
+
+        var bodies = scene.matter.world.localWorld.bodies;
+        bodies.forEach(function (body) {
+            // VIEWPORT CULLING FOR DEBUG
+            if (body.position.x < cam.scrollX - pad || body.position.x > cam.scrollX + cam.width + pad ||
+                body.position.y < cam.scrollY - pad || body.position.y > cam.scrollY + cam.height + pad) {
+                // Approximate culling check - better than nothing
+                return;
+            }
+
+            if (body.parts.length > 1) {
+                for (var i = 1; i < body.parts.length; i++) {
+                    drawBody(g, body.parts[i]);
+                }
+            } else {
+                drawBody(g, body);
+            }
+        });
+
+        function drawBody(g, body) {
+            var elev = Golf.getElevationAt(body.position.x, body.position.y);
+            var iso = Golf.toIsometric(body.position.x, body.position.y);
+
+            if (body.circleRadius) {
+                g.strokeEllipse(iso.x, iso.y - elev, body.circleRadius * 2, body.circleRadius);
+            } else {
+                g.beginPath();
+                body.vertices.forEach(function (v, i) {
+                    var isoV = Golf.toIsometric(v.x, v.y);
+                    if (i === 0) g.moveTo(isoV.x, isoV.y - elev);
+                    else g.lineTo(isoV.x, isoV.y - elev);
+                });
+                g.closePath();
+                g.strokePath();
+            }
+        }
+    };
 
     function handleHumanInput(scene, p, delta) {
         if (p.driving) {
@@ -676,7 +776,7 @@
             default: 'matter',
             matter: {
                 gravity: { y: 0 },
-                debug: true,
+                debug: false,
                 timing: {
                     fixedDelta: 1000 / 60
                 }

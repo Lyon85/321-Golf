@@ -67,8 +67,18 @@
         }
 
         // Build movement vector
-        var moveX = (keys.D ? 1 : 0) - (keys.A ? 1 : 0);
-        var moveY = (keys.S ? 1 : 0) - (keys.W ? 1 : 0);
+        var moveX = 0;
+        var moveY = 0;
+
+        // Remap keys to isometric axes:
+        // Visually Up (W) -> World North-West (-1, -1)
+        // Visually Down (S) -> World South-East (1, 1)
+        // Visually Left (A) -> World South-West (-1, 1)
+        // Visually Right (D) -> World North-East (1, -1)
+        if (keys.W) { moveX -= 1; moveY -= 1; }
+        if (keys.S) { moveX += 1; moveY += 1; }
+        if (keys.A) { moveX -= 1; moveY += 1; }
+        if (keys.D) { moveX += 1; moveY -= 1; }
 
         // Normalize diagonal movement
         var len = Math.hypot(moveX, moveY);

@@ -140,6 +140,7 @@
                     scene.matter.body.setPosition(localP.body, { x: data.x, y: data.y });
                     localP.flipX = data.flipX;
                     if (data.direction) localP.direction = data.direction; // Sync direction
+                    if (data.z !== undefined) localP.z = data.z; // Sync jump height
 
                     // Sync Ball Position
                     if (data.ballX !== undefined && data.ballY !== undefined) {
@@ -358,6 +359,7 @@
             var data = {
                 x: p.body.position.x,
                 y: p.body.position.y,
+                z: p.z || 0, // Sync jump height
                 ballX: p.ball ? p.ball.position.x : 0,
                 ballY: p.ball ? p.ball.position.y : 0,
                 ballY: p.ball ? p.ball.position.y : 0,

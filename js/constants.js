@@ -62,7 +62,27 @@
         WATER3: { name: 'Abyss', color: 0x2874a6, frictionAir: 0.3, label: 'water3', elevation: 0 },
         MOUNTAIN: { name: 'Mountain', color: 0x7f8c8d, frictionAir: 0.1, label: 'mountain', elevation: 20 },
         M1: { name: 'Mountain 1', color: 0xA2B4B5, frictionAir: 0.1, label: 'm1', elevation: 30 },
-        M2: { name: 'Mountain 2', color: 0x7f8c8d, frictionAir: 0.1, label: 'm2', elevation: 40 },
+        M2: { name: 'Mountain 2', color: 0x7f8c8d, frictionAir: 0.1, label: 'm2', elevation: 60 },
         M3: { name: 'Mountain 3', color: 0x627071, frictionAir: 0.1, label: 'm3', elevation: 100 }
+    };
+
+    /**
+     * Converts world (top-down) coordinates to screen (isometric) coordinates.
+     */
+    Golf.toIsometric = function (x, y) {
+        return {
+            x: x - y,
+            y: (x + y) / 2
+        };
+    };
+
+    /**
+     * Converts screen (isometric) coordinates back to world (top-down) coordinates.
+     */
+    Golf.fromIsometric = function (isoX, isoY) {
+        return {
+            x: (2 * isoY + isoX) / 2,
+            y: (2 * isoY - isoX) / 2
+        };
     };
 })(typeof window !== 'undefined' ? window : this);

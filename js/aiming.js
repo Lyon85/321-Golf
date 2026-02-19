@@ -50,12 +50,14 @@
             if (isLocal) scene.powerMeterFill.style.width = p.power + '%';
 
             var playerX = p.body.position.x;
-            var playerY = p.body.position.y - (Golf.getElevationAt(p.body.position.x, p.body.position.y)) + 20; // Aim from visual feet
+            var playerY = p.body.position.y;
+
+            var worldMouse = Golf.fromIsometric(activePointer.worldX, activePointer.worldY);
             var mouseAngle = Phaser.Math.Angle.Between(
                 playerX,
                 playerY,
-                activePointer.worldX,
-                activePointer.worldY
+                worldMouse.x,
+                worldMouse.y
             );
             p.aimAngle = mouseAngle; // Store for visuals
 
@@ -70,19 +72,32 @@
             if (isLocal) {
                 state.hitConeGraphics.clear();
                 if (isMouseDown || isRightDown) {
+                    var elev = Golf.getElevationAt(playerX, playerY);
+                    var pIso = Golf.toIsometric(playerX, playerY);
+
                     state.hitConeGraphics.fillStyle(0xffffff, 0.15);
+                    state.hitConeGraphics.lineStyle(2, 0xffffff, 0.3);
+
+                    // Drawing an isometric arc is complex with just .arc()
+                    // We'll draw it manually with vertices to handle the isometric squish
                     state.hitConeGraphics.beginPath();
-                    state.hitConeGraphics.moveTo(playerX, playerY);
-                    state.hitConeGraphics.arc(
-                        playerX,
-                        playerY,
-                        MAX_HIT_DISTANCE,
-                        mouseAngle - Phaser.Math.DegToRad(CONE_ANGLE / 2),
-                        mouseAngle + Phaser.Math.DegToRad(CONE_ANGLE / 2)
-                    );
+                    state.hitConeGraphics.moveTo(pIso.x, pIso.y - elev);
+
+                    var startAngle = mouseAngle - Phaser.Math.DegToRad(CONE_ANGLE / 2);
+                    var endAngle = mouseAngle + Phaser.Math.DegToRad(CONE_ANGLE / 2);
+                    var steps = 10;
+
+                    for (var i = 0; i <= steps; i++) {
+                        var angle = startAngle + (endAngle - startAngle) * (i / steps);
+                        var tx = playerX + Math.cos(angle) * MAX_HIT_DISTANCE;
+                        var ty = playerY + Math.sin(angle) * MAX_HIT_DISTANCE;
+                        var tIso = Golf.toIsometric(tx, ty);
+                        var tElev = Golf.getElevationAt(tx, ty);
+                        state.hitConeGraphics.lineTo(tIso.x, tIso.y - tElev);
+                    }
+
                     state.hitConeGraphics.closePath();
                     state.hitConeGraphics.fill();
-                    state.hitConeGraphics.lineStyle(2, 0xffffff, 0.3);
                     state.hitConeGraphics.strokePath();
                 }
             }
@@ -112,18 +127,27 @@
                     var len = (p.power / 100) * 800 * club.power * 100 * pwrMult;
 
                     for (var i = 0; i < len; i += 25) {
+                        var x1 = p.ball.position.x + Math.cos(shotAngle) * i;
+                        var y1 = p.ball.position.y + Math.sin(shotAngle) * i;
+                        var x2 = p.ball.position.x + Math.cos(shotAngle) * (i + 12);
+                        var y2 = p.ball.position.y + Math.sin(shotAngle) * (i + 12);
+
+                        var iso1 = Golf.toIsometric(x1, y1);
+                        var iso2 = Golf.toIsometric(x2, y2);
+                        var elev1 = Golf.getElevationAt(x1, y1);
+                        var elev2 = Golf.getElevationAt(x2, y2);
+
                         state.aimLine.lineBetween(
-                            p.ball.position.x + Math.cos(shotAngle) * i,
-                            p.ball.position.y + Math.sin(shotAngle) * i,
-                            p.ball.position.x + Math.cos(shotAngle) * (i + 12),
-                            p.ball.position.y + Math.sin(shotAngle) * (i + 12)
+                            iso1.x, iso1.y - elev1,
+                            iso2.x, iso2.y - elev2
                         );
                     }
                 }
             }
         } else if (p.isAiming) {
             playerX = p.body.position.x;
-            playerY = p.body.position.y - (Golf.getElevationAt(p.body.position.x, p.body.position.y)) + 20; // Aim from visual feet
+            playerY = p.body.position.y;
+
             ballDist = Phaser.Math.Distance.Between(
                 playerX, playerY,
                 p.ball.position.x, p.ball.position.y
@@ -132,10 +156,12 @@
                 playerX, playerY,
                 p.ball.position.x, p.ball.position.y
             );
+
+            var worldMouse = Golf.fromIsometric(activePointer.worldX, activePointer.worldY);
             mouseAngle = Phaser.Math.Angle.Between(
                 playerX, playerY,
-                activePointer.worldX,
-                activePointer.worldY
+                worldMouse.x,
+                worldMouse.y
             );
             angleDiff = Math.abs(Phaser.Math.Angle.Wrap(ballAngle - mouseAngle));
             isBallInCone =

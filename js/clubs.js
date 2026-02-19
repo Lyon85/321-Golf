@@ -75,23 +75,15 @@
     };
 
     Golf.createClub = function (scene, x, y, type, id) {
-        var sprite = scene.add.rectangle(x, y, 34, 34, type.color).setStrokeStyle(2, 0xffffff);
-        var txt = scene.add.text(x, y, type.name.charAt(0), {
+        var sprite = scene.add.rectangle(0, 0, 32, 32, type.color).setStrokeStyle(2, 0xffffff);
+        var txt = scene.add.text(0, 0, type.name.charAt(0), {
             family: 'Outfit',
-            fontSize: '16px',
+            fontSize: '14px',
             fontStyle: 'bold',
             color: '#000'
         }).setOrigin(0.5);
 
         state.clubs.push({ id: id, sprite: sprite, txt: txt, type: type, x: x, y: y });
-
-        scene.tweens.add({
-            targets: [sprite, txt],
-            y: y - 10,
-            duration: 1000 + Math.random() * 500,
-            yoyo: true,
-            repeat: -1
-        });
     }
 
 

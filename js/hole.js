@@ -132,8 +132,15 @@
             }
         }
 
-        state.hole.setPosition(hx, hy);
-        state.hole.setDepth(hy);
+        var iso = Golf.toIsometric(hx, hy);
+        var elev = Golf.getElevationAt(hx, hy);
+        state.hole.setPosition(iso.x, iso.y - elev);
+        state.hole.setDepth(hx + hy - elev + 1);
+
+        // Store world coordinates for physics-based snapping (like onBallSunk)
+        state.hole.worldX = hx;
+        state.hole.worldY = hy;
+
         if (state.holeSensor) {
             scene.matter.body.setPosition(state.holeSensor, { x: hx, y: hy });
         }
@@ -204,8 +211,11 @@
         if (p.ballSprite) p.ballSprite.setVisible(false);
         if (p.ballShadow) p.ballShadow.setVisible(false);
 
-        // Snap physics body to hole center
-        scene.matter.body.setPosition(p.ball, { x: state.hole.x, y: state.hole.y });
+        // Snap physics body to hole center (using top-down world coordinates)
+        var hWorldX = state.hole.worldX !== undefined ? state.hole.worldX : state.hole.x;
+        var hWorldY = state.hole.worldY !== undefined ? state.hole.worldY : state.hole.y;
+
+        scene.matter.body.setPosition(p.ball, { x: hWorldX, y: hWorldY });
         scene.matter.body.setVelocity(p.ball, { x: 0, y: 0 });
 
         // Wait a bit, then reappear (and sync)

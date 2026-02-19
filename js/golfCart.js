@@ -150,22 +150,76 @@
         var force = (baseForce + turboForceBoost * p.turboRamp) * speedScale;
 
         var torque = 3.5 * speedScale; // Increased from 2 for faster rotation
+        // Offset forward direction by -45 degrees for isometric alignment
         var angle = cart.body.angle - Math.PI / 2;
 
-        if (keys.W) {
-            scene.matter.body.applyForce(cart.body, cart.body.position, {
-                x: Math.cos(angle) * force,
-                y: Math.sin(angle) * force
-            });
-        }
-        if (keys.S) {
-            scene.matter.body.applyForce(cart.body, cart.body.position, {
-                x: -Math.cos(angle) * (force * 0.6), // Increased from 0.3
-                y: -Math.sin(angle) * (force * 0.6)
-            });
+        // Elevation Climbing Restriction: Max climb is 5
+        var currentElevation = Golf.getElevationAt(cart.body.position.x, cart.body.position.y);
+        var checkDist = 45; // Look ahead/back slightly
+
+        var aheadX = cart.body.position.x + Math.cos(angle) * checkDist;
+        var aheadY = cart.body.position.y + Math.sin(angle) * checkDist;
+        var aheadElev = Golf.getElevationAt(aheadX, aheadY);
+        var isSteepAhead = (aheadElev - currentElevation) > 5;
+
+        var backX = cart.body.position.x - Math.cos(angle) * checkDist;
+        var backY = cart.body.position.y - Math.sin(angle) * checkDist;
+        var backElev = Golf.getElevationAt(backX, backY);
+        var isSteepBack = (backElev - currentElevation) > 5;
+
+        // Helper for crash effect
+        var triggerCrash = function () {
+            var now = scene.time.now;
+            if (!p.lastCrashTime || now - p.lastCrashTime > 1000) {
+                p.lastCrashTime = now;
+                if (Golf.state.particles) {
+                    Golf.state.particles.emitParticleAt(cart.body.position.x, cart.body.position.y, 15);
+                }
+                scene.cameras.main.shake(200, 0.003);
+            }
+            // Hard stop and bounce back
+            var vx = cart.body.velocity.x;
+            var vy = cart.body.velocity.y;
+            scene.matter.body.setVelocity(cart.body, { x: -vx * 0.5, y: -vy * 0.5 });
+        };
+
+        // Check if moving into a steep slope regardless of keys (glitch prevention)
+        var velocity = Math.sqrt(cart.body.velocity.x * cart.body.velocity.x + cart.body.velocity.y * cart.body.velocity.y);
+        if (velocity > 1.0) {
+            // Determine if velocity is pointing towards the steep slope
+            var velAngle = Math.atan2(cart.body.velocity.y, cart.body.velocity.x);
+            var angleDiffAhead = Math.abs(Phaser.Math.Angle.ShortestBetween(velAngle * 180 / Math.PI, angle * 180 / Math.PI));
+            var angleDiffBack = Math.abs(Phaser.Math.Angle.ShortestBetween(velAngle * 180 / Math.PI, (angle + Math.PI) * 180 / Math.PI));
+
+            if (isSteepAhead && angleDiffAhead < 60) {
+                triggerCrash();
+            } else if (isSteepBack && angleDiffBack < 60) {
+                triggerCrash();
+            }
         }
 
-        var velocity = Math.sqrt(cart.body.velocity.x * cart.body.velocity.x + cart.body.velocity.y * cart.body.velocity.y);
+        if (keys.W) {
+            if (!isSteepAhead) {
+                scene.matter.body.applyForce(cart.body, cart.body.position, {
+                    x: Math.cos(angle) * force,
+                    y: Math.sin(angle) * force
+                });
+            } else {
+                triggerCrash();
+            }
+        }
+        if (keys.S) {
+            if (!isSteepBack) {
+                scene.matter.body.applyForce(cart.body, cart.body.position, {
+                    x: -Math.cos(angle) * (force * 0.6),
+                    y: -Math.sin(angle) * (force * 0.6)
+                });
+            } else {
+                triggerCrash();
+            }
+        }
+
+        velocity = Math.sqrt(cart.body.velocity.x * cart.body.velocity.x + cart.body.velocity.y * cart.body.velocity.y);
         if (velocity > 0.5) {
             var turnDir = keys.S ? -1 : 1;
             if (keys.A) cart.body.torque = -torque * turnDir;

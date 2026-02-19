@@ -26,7 +26,7 @@
 
 
 .player-shadow {
-    transform: rotateY(90deg) rotateX(90deg);
+    transform: rotateY(90deg) rotateX(90deg) translateZ(var(--shadow-z, 0)) scale(var(--shadow-scale, 1));
     position: absolute;
     z-index: -1;
     width: 160px;

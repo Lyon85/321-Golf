@@ -19,19 +19,17 @@
             });
             return;
         }
-        // Split by comma BUT only if not inside brackets
         var tokens = Golf.MAP_DATA.replace(/\s+/g, '').split(/,(?![^\[]*\])/);
 
         state.mapGrid = [];
         state.spawnPoint = { x: config.tileSize / 2, y: config.tileSize / 2 };
 
-        // worldGroup is still used to hold dynamic elements if needed, 
-        // but pool objects will be added to it during init.
         if (!state.worldGroup) {
             state.worldGroup = scene.add.container(0, 0).setDepth(-11);
         }
 
-        state.teePositions = []; // Reset tee positions
+        state.teePositions = [];
+        var waterBlocks = {}; // Track water blocks for merging: { type: [ {r, c} ] }
 
         for (var r = 0; r < config.rows; r++) {
             state.mapGrid[r] = [];
@@ -40,27 +38,19 @@
                 var x = c * config.tileSize + config.tileSize / 2;
                 var y = r * config.tileSize + config.tileSize / 2;
 
-                // Parse Modifier Format: g1[h], g2[t], g3[i90] (terrain + optional [modifiers])
                 var match = rawToken.match(/^([a-zA-Z0-9]+)(?:\[(.*?)\])?$/);
-                var token = match ? match[1] : rawToken; // Base terrain token (w1, g2, etc.)
+                var token = match ? match[1] : rawToken;
                 var modifiers = match && match[2] ? match[2].split(',') : [];
 
-                // Parser for incline (i) and direction (d) modifiers
                 var inclineMod = null;
                 var directionMod = null;
 
                 for (var m = 0; m < modifiers.length; m++) {
                     var mStr = modifiers[m];
                     var im = mStr.match(/^i(-?\d+)$/);
-                    if (im) {
-                        inclineMod = parseInt(im[1], 10);
-                        continue;
-                    }
+                    if (im) inclineMod = parseInt(im[1], 10);
                     var dm = mStr.match(/^d(-?\d+)$/);
-                    if (dm) {
-                        directionMod = parseInt(dm[1], 10);
-                        continue;
-                    }
+                    if (dm) directionMod = parseInt(dm[1], 10);
                 }
 
                 var tileInfo = {
@@ -72,78 +62,92 @@
                     isTee: false
                 };
 
+                // Base Type Logic
+                if (token.startsWith('w')) {
+                    tileInfo.type = token === 'w1' ? 'water1' : (token === 'w2' ? 'water2' : (token === 'w3' ? 'water3' : 'water'));
 
+                    // Collect water for merging instead of adding sensors immediately
+                    if (!waterBlocks[tileInfo.type]) waterBlocks[tileInfo.type] = [];
+                    waterBlocks[tileInfo.type].push({ r: r, c: c, x: x, y: y });
 
-                // Base Type Logic (terrain only; modifiers already set hole/tee)
-                if (!tileInfo.type || tileInfo.type === 'grass') {
-                    if (token.startsWith('w')) {
-                        tileInfo.type = token === 'w1' ? 'water1' : (token === 'w2' ? 'water2' : (token === 'w3' ? 'water3' : 'water'));
-
-                        // Always a sensor for terrain effects (swimming, slowing)
+                    // Solid blocker for buggies in w2/w3 (still added per-tile for simplicity, or could be merged too)
+                    if (token === 'w2' || token === 'w3') {
                         scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
-                            isStatic: true, isSensor: true, label: tileInfo.type,
-                            collisionFilter: { category: CAT_TERRAIN }
+                            isStatic: true, label: tileInfo.type + '_solid',
+                            collisionFilter: { category: Golf.CAT_DEEP_WATER }
                         });
-
-                        // Solid blocker for buggies in w2/w3
-                        if (token === 'w2' || token === 'w3') {
-                            scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
-                                isStatic: true, label: tileInfo.type + '_solid',
-                                collisionFilter: { category: Golf.CAT_DEEP_WATER }
-                            });
-                        }
-                    } else if (token.startsWith('g')) {
-                        tileInfo.type = 'grass';
-                    } else if (token.startsWith('b')) {
-                        tileInfo.type = 'bunker';   // ✅ set type for friction
-                    } else if (token === 'r') {
-                        tileInfo.type = 'rough';
-                    } else if (token.startsWith('m')) {
-                        tileInfo.type = 'mountain';
-                        scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
-                            isStatic: true, isSensor: true, label: 'mountain',
-                            collisionFilter: { category: CAT_TERRAIN }
-                        });
-                    } else if (token === 't') {
-                        tileInfo.type = 'grass';
-                    } else if (token === 'h') {
-                        tileInfo.type = 'hole_position';
-                        if (!state.holePositions) state.holePositions = [];
-                        state.holePositions.push({ x: x, y: y, row: r, col: c });
-                    } else if (token.startsWith('i') && !inclineMod) {
-                        tileInfo.type = 'incline';
-                        tileInfo.angle = parseInt(token.substring(1), 10);
                     }
+                } else if (token.startsWith('g')) {
+                    tileInfo.type = 'grass';
+                } else if (token.startsWith('b')) {
+                    tileInfo.type = 'bunker';
+                } else if (token === 'r') {
+                    tileInfo.type = 'rough';
+                } else if (token.startsWith('m')) {
+                    tileInfo.type = 'mountain';
+                    scene.matter.add.rectangle(x, y, config.tileSize, config.tileSize, {
+                        isStatic: true, isSensor: true, label: 'mountain',
+                        collisionFilter: { category: CAT_TERRAIN }
+                    });
+                } else if (token === 't') {
+                    tileInfo.type = 'grass';
+                } else if (token === 'h') {
+                    tileInfo.type = 'hole_position';
+                    if (!state.holePositions) state.holePositions = [];
+                    state.holePositions.push({ x: x, y: y, row: r, col: c });
+                } else if (token.startsWith('i')) {
+                    tileInfo.type = 'incline';
+                    tileInfo.direction = directionMod !== null ? directionMod : parseInt(token.substring(1), 10);
+                    tileInfo.incline = inclineMod !== null ? inclineMod : 5;
                 }
 
-                // Modifier: [t] = tee spawn
                 if (modifiers.indexOf('t') !== -1 || token === 't') {
                     tileInfo.isTee = true;
                     state.teePositions.push({ x: x, y: y });
                 }
-
-                // Modifier: [h] = hole spawn
                 if (modifiers.indexOf('h') !== -1 || token === 'h') {
                     tileInfo.type = 'hole_position';
                     if (!state.holePositions) state.holePositions = [];
                     state.holePositions.push({ x: x, y: y, row: r, col: c });
                 }
 
-                if (directionMod !== null) {
-                    tileInfo.type = 'incline';
-                    tileInfo.direction = directionMod;
-                } else if (inclineMod !== null) {
-                    // Backward compatibility: [i90] without [dXX] sets direction (old behavior)
-                    tileInfo.type = 'incline';
-                    tileInfo.direction = inclineMod;
-                    tileInfo.incline = 5; // Default some incline if only angle given
-                } else if (token.startsWith('i')) {
-                    tileInfo.type = 'incline';
-                    tileInfo.direction = parseInt(token.substring(1), 10);
-                    tileInfo.incline = 5;
-                }
-
                 state.mapGrid[r][c] = tileInfo;
+            }
+        }
+
+        // --- MERGE WATER SENSORS ---
+        // Simple row-merging algorithm for performance
+        for (var type in waterBlocks) {
+            var blocks = waterBlocks[type];
+            var grid = {}; // r -> [c]
+            blocks.forEach(b => {
+                if (!grid[b.r]) grid[b.r] = [];
+                grid[b.r].push(b.c);
+            });
+
+            for (var rStr in grid) {
+                var r = parseInt(rStr);
+                var cols = grid[r].sort((a, b) => a - b);
+
+                var start = 0;
+                while (start < cols.length) {
+                    var end = start;
+                    while (end + 1 < cols.length && cols[end + 1] === cols[end] + 1) {
+                        end++;
+                    }
+
+                    // Found a contiguous row segment from start to end
+                    var count = (end - start) + 1;
+                    var centerX = (cols[start] * config.tileSize) + (count * config.tileSize) / 2;
+                    var centerY = r * config.tileSize + config.tileSize / 2;
+
+                    scene.matter.add.rectangle(centerX, centerY, count * config.tileSize, config.tileSize, {
+                        isStatic: true, isSensor: true, label: type,
+                        collisionFilter: { category: CAT_TERRAIN }
+                    });
+
+                    start = end + 1;
+                }
             }
         }
     };
@@ -153,22 +157,30 @@
      */
     Golf.initTilePool = function (scene) {
         var config = Golf.MAP_CONFIG;
-        // Calculate max tiles visible on screen plus a buffer
-        var maxTilesX = Math.ceil(scene.cameras.main.width / config.tileSize) + 10;
-        var maxTilesY = Math.ceil(scene.cameras.main.height / config.tileSize) + 10;
-        var poolSize = maxTilesX * maxTilesY;
+        // Increase pool size significantly for high-res screens and padding.
+        // A single frame can now require ~1500-2000 tiles with large padding.
+        var poolSize = 3000;
 
         state.tilePool = [];
         for (var i = 0; i < poolSize; i++) {
             // Base rectangle for non-textured tiles
+            // In isometric, the diamond width is roughly config.tileSize and height is config.tileSize / 2
             var rect = scene.add.rectangle(0, 0, config.tileSize, config.tileSize, 0xffffff)
-                .setStrokeStyle(0, 0x000000, 0.3)
                 .setDepth(-11)
                 .setVisible(false);
 
-            // Side rectangle for 3D depth
-            var side = scene.add.rectangle(0, 0, config.tileSize, 1, 0x000000)
-                .setDepth(-12) // Behind top faces but in front of ground
+            // SIDE NOTE: For simple rectangles to look like isometric diamonds, 
+            // we will rotate them and scale them in updateMapVisibility.
+            // Or we could use graphics, but using images/sprites is often easier to manage.
+
+            // Left and Right sides for the cube face
+            var sideL = scene.add.polygon(0, 0, [0, 0, 0, 0, 0, 0, 0, 0], 0x000000)
+                .setOrigin(0, 0)
+                .setDepth(-12)
+                .setVisible(false);
+            var sideR = scene.add.polygon(0, 0, [0, 0, 0, 0, 0, 0, 0, 0], 0x000000)
+                .setOrigin(0, 0)
+                .setDepth(-12)
                 .setVisible(false);
 
             // Debug/Info Labels
@@ -198,25 +210,24 @@
             }).setOrigin(0.5).setDepth(-7).setVisible(false);
 
             // 1. Create the single image object for the pool
-            // We initialize with g1, but updateMapVisibility will swap it to g2 if needed
             var img = scene.add.image(0, 0, 'grass_g1_texture').setDepth(-11).setVisible(false);
-
-            // 2. Scale the image to perfectly match the tileSize
-            // Use setDisplaySize to force the image to match your grid pixels
-            img.setDisplaySize(config.tileSize, config.tileSize);
 
             // 3. Add to pool and worldGroup
             state.tilePool.push({
                 rect: rect,
-                side: side,
+                sideL: sideL,
+                sideR: sideR,
                 img: img,
                 label: label,
                 arrow: arrow,
                 tee: { marker: teeMarker, inner: teeInner, text: teeText }
             });
 
-            state.worldGroup.add([rect, side, img, label, arrow, teeMarker, teeInner, teeText]);
+            state.worldGroup.add([rect, sideL, sideR, img, label, arrow, teeMarker, teeInner, teeText]);
         }
+
+        // Scale the entire world group Y to create the isometric perspective
+        state.worldGroup.setScale(1, 0.5);
         state.poolIdx = 0;
     };
     /**
@@ -228,22 +239,62 @@
         var cam = scene.cameras.main;
         var config = Golf.MAP_CONFIG;
 
-        var startCol = Math.max(0, Math.floor(cam.scrollX / config.tileSize));
-        var endCol = Math.min(config.cols - 1, Math.ceil((cam.scrollX + cam.width) / config.tileSize));
-        var startRow = Math.max(0, Math.floor(cam.scrollY / config.tileSize));
-        var endRow = Math.min(config.rows - 1, Math.ceil((cam.scrollY + cam.height) / config.tileSize));
-
         // Hide all pooled objects first to prevent ghosts
         state.tilePool.forEach(function (p) {
             p.rect.setVisible(false);
-            p.side.setVisible(false);
-            p.img.setVisible(false); // Make sure the image is reset too
+            p.sideL.setVisible(false);
+            p.sideR.setVisible(false);
+            p.img.setVisible(false);
             p.label.setVisible(false);
             p.arrow.setVisible(false);
             p.tee.marker.setVisible(false);
             p.tee.inner.setVisible(false);
             p.tee.text.setVisible(false);
         });
+
+        // --- OPTIMIZED VIEWPORT CULLING ---
+        // We need to find which (r, c) tiles overlap the screen (cam.scrollX, cam.scrollY, cam.width, cam.height)
+        // Screen coords: x = c*S - r*S, y = (c*S + r*S)/2
+        // Inverse: 
+        // c*S = y + x/2
+        // r*S = y - x/2
+
+        var S = config.tileSize;
+        var pad = S * 5; // Increased padding for high elevation and smooth driving
+
+        var minX = cam.scrollX - pad;
+        var maxX = cam.scrollX + cam.width + pad;
+        var minY = cam.scrollY - pad;
+        var maxY = cam.scrollY + cam.height + pad;
+
+        // Solver for: 
+        // x = (c-r)S
+        // y = (c+r+1)S/2  <-- Note the +1 comes from S/2 offset in tile center positioning
+
+        var minRS = Math.min(minY - minX / 2, minY - maxX / 2, maxY - minX / 2, maxY - maxX / 2);
+        var maxRS = Math.max(minY - minX / 2, minY - maxX / 2, maxY - minX / 2, maxY - maxX / 2);
+        var minCS = Math.min(minY + minX / 2, minY + maxX / 2, maxY + minX / 2, maxY + maxX / 2);
+        var maxCS = Math.max(minY + minX / 2, minY + maxX / 2, maxY + minX / 2, maxY + maxX / 2);
+
+        // Subtract S/2 to account for the center offset in our solver
+        var startRow = Math.max(0, Math.floor((minRS - S / 2) / S) - 2);
+        var endRow = Math.min(config.rows - 1, Math.ceil((maxRS - S / 2) / S) + 2);
+        var startCol = Math.max(0, Math.floor((minCS - S / 2) / S) - 2);
+        var endCol = Math.min(config.cols - 1, Math.ceil((maxCS - S / 2) / S) + 2);
+
+        // --- VISION RANGE CONSTRAINT (50 TILES AROUND PLAYER) ---
+        var localPlayerIndex = state.myPlayerId !== null ? state.myPlayerId : 0;
+        var p = state.players[localPlayerIndex];
+        if (p && p.body) {
+            var pc = Math.floor(p.body.position.x / S);
+            var pr = Math.floor(p.body.position.y / S);
+            var range = 50;
+
+            startRow = Math.max(startRow, pr - range);
+            endRow = Math.min(endRow, pr + range);
+            startCol = Math.max(startCol, pc - range);
+            endCol = Math.min(endCol, pc + range);
+        }
 
         var poolIdx = 0;
         for (var r = startRow; r <= endRow; r++) {
@@ -252,11 +303,15 @@
 
                 var tile = state.mapGrid[r][c];
                 var poolObj = state.tilePool[poolIdx];
-                var x = c * config.tileSize + config.tileSize / 2;
-                var y = r * config.tileSize + config.tileSize / 2;
 
-                // Configure base color for non-textured tiles
-                var color = 0x2ecc71; // Default Grass
+                var worldX = c * S + S / 2;
+                var worldY = r * S + S / 2;
+
+                // Screen coordinates for positioning
+                var x = Math.round(worldX - worldY);
+                var y = Math.round(worldX + worldY);
+
+                var color = 0x2ecc71;
                 var baseToken = tile.baseToken != null ? tile.baseToken : tile.token;
 
                 if (baseToken.startsWith('w')) {
@@ -283,109 +338,78 @@
                     else color = 0x7f8c8d;
                 }
 
-                var elevation = Golf.getElevationAt(x, y);
+                var elevation = Golf.getElevationAt(worldX, worldY);
+                var topY = Math.round(y - elevation * 2);
 
-                // Apply 3D elevation shift (top Y is actual Y - elevation)
-                var topY = y - elevation;
-
-                // --- TEXTURE LOGIC FOR G1 AND G2 ---
-                // 1. Define which tokens should use images and what their texture keys are
                 var textureMap = {
-                    'g1': 'grass_g1_texture',
-                    'g2': 'grass_g2_texture',
-                    'g3': 'grass_g3_texture',
-                    'w1': 'water_w1_texture',
-                    'w2': 'water_w2_texture',
-                    'w3': 'water_w3_texture',
-                    'b': 'bunker_b1_texture',
-                    'b2': 'bunker_b2_texture',
-                    'b3': 'bunker_b3_texture',
-                    'm1': 'mountain_m1_texture',
-                    'm2': 'mountain_m2_texture',
-                    'm3': 'mountain_m3_texture'
+                    'g1': 'grass_g1_texture', 'g2': 'grass_g2_texture', 'g3': 'grass_g3_texture',
+                    'w1': 'water_w1_texture', 'w2': 'water_w2_texture', 'w3': 'water_w3_texture',
+                    'b': 'bunker_b1_texture', 'b2': 'bunker_b2_texture', 'b3': 'bunker_b3_texture',
+                    'm1': 'mountain_m1_texture', 'm2': 'mountain_m2_texture', 'm3': 'mountain_m3_texture'
                 };
 
+                var isoSize = Math.ceil(S * 1.41422) + 1;
+
                 if (textureMap[baseToken]) {
-                    poolObj.rect.setVisible(false);
                     poolObj.img.setTexture(textureMap[baseToken])
                         .setPosition(x, topY)
-                        .setDisplaySize(config.tileSize, config.tileSize)
+                        .setRotation(Math.PI / 4)
+                        .setDisplaySize(isoSize, isoSize)
                         .setVisible(true);
 
-                    // --- SINE WAVE SHIMMER FOR WATER ---
+                    if (elevation === 0) poolObj.img.setAlpha(1);
+
                     if (baseToken.startsWith('w')) {
-                        // scene.time.now is a millisecond counter
-                        // Dividing by 500 controls the speed (higher = slower)
-                        // Adding (r + c) offsets the wave so tiles don't flash all at once
                         var wave = Math.sin((scene.time.now / 600) + (r + c) * 0.5);
-
-                        // Map the wave (-1 to 1) to a brightness range (0.7 to 1.0)
                         var brightness = Phaser.Math.Linear(0.7, 1.0, (wave + 1) / 2);
-
-                        // Create a color tint (RGB). We keep Blue high and vary Red/Green.
-                        // This creates a "sparkle" effect
                         var colorValue = Math.floor(255 * brightness);
                         poolObj.img.setTint(Phaser.Display.Color.GetColor(colorValue, colorValue, 255));
                     } else {
-                        // Clear tint for grass/other tiles so they don't look blue
                         poolObj.img.clearTint();
                     }
                 } else {
-                    poolObj.img.setVisible(false);
-                    poolObj.rect.setPosition(x, topY).setFillStyle(color).setVisible(true);
-                }
-
-                // Render side faces for 3D depth
-                if (elevation !== 0) {
-                    var sideColor = Phaser.Display.Color.ValueToColor(color).darken(30).color;
-                    var sideHeight = Math.abs(elevation);
-                    var sideY = (elevation > 0) ? (topY + config.tileSize / 2 + sideHeight / 2) : (topY - config.tileSize / 2 - sideHeight / 2);
-
-                    if (elevation < 0) {
-                        // For recessed blocks like water/bunker, the side is the "wall" from ground down to the top face
-                        sideY = topY - config.tileSize / 2 - sideHeight / 2;
-                        // Actually, if it's recessed, we draw the side ABOVE the top face to ground level (y - tile/2)
-                        var groundY = y - config.tileSize / 2;
-                        var faceTopEdge = topY - config.tileSize / 2;
-                        sideHeight = Math.abs(faceTopEdge - groundY);
-                        sideY = groundY + sideHeight / 2;
-                    } else {
-                        // For raised blocks, the side is from the top face down to ground level
-                        var groundY = y + config.tileSize / 2;
-                        var faceBottomEdge = topY + config.tileSize / 2;
-                        sideHeight = Math.abs(faceBottomEdge - groundY);
-                        sideY = groundY - sideHeight / 2;
-                    }
-
-                    poolObj.side.setPosition(x, sideY)
-                        .setSize(config.tileSize, sideHeight)
-                        .setFillStyle(sideColor)
+                    poolObj.rect.setPosition(x, topY)
+                        .setRotation(Math.PI / 4)
+                        .setDisplaySize(isoSize, isoSize)
+                        .setFillStyle(color)
                         .setVisible(true);
-                } else {
-                    poolObj.side.setVisible(false);
                 }
 
-                // --- LABELS AND ARROWS ---
-                var labelText = tile.baseToken;
-                var isRightDown = scene.input.activePointer.rightButtonDown();
+                // Sides
+                var sideColorL = Phaser.Display.Color.ValueToColor(color).darken(20).color;
+                var sideColorR = Phaser.Display.Color.ValueToColor(color).darken(40).color;
 
-                if (tile.direction !== null) {
-                    if (isRightDown) {
-                        var phaserAngle = tile.direction - 90;
-                        var alpha = Phaser.Math.Clamp(0.3 + (tile.incline / 45), 0.3, 1);
-                        var scale = Phaser.Math.Clamp(1 + (tile.incline / 15), 1, 3);
-                        poolObj.arrow.setPosition(x, y)
-                            .setAngle(phaserAngle)
-                            .setAlpha(alpha)
-                            .setScale(scale)
-                            .setVisible(true);
-                    } else {
-                        poolObj.arrow.setVisible(false);
-                    }
-                    labelText += "\n" + tile.incline + "°";
+                var elevSW = (r + 1 < config.rows) ? Golf.getElevationAt(worldX, worldY + S) : 0;
+                var diffSW = elevation - elevSW;
+                var elevSE = (c + 1 < config.cols) ? Golf.getElevationAt(worldX + S, worldY) : 0;
+                var diffSE = elevation - elevSE;
+
+                var halfDiagX = Math.round(S);
+                var halfDiagY = Math.round(S);
+
+                if (diffSW > 0) {
+                    var h = diffSW * 2 + 2;
+                    poolObj.sideL.setPosition(x, topY)
+                        .setTo([-halfDiagX - 1, -1, 1, halfDiagY + 1, 1, halfDiagY + h, -halfDiagX - 1, h])
+                        .setFillStyle(sideColorL).setVisible(true);
+                }
+                if (diffSE > 0) {
+                    var h = diffSE * 2 + 2;
+                    poolObj.sideR.setPosition(x, topY)
+                        .setTo([-1, halfDiagY + 1, halfDiagX + 1, -1, halfDiagX + 1, h, -1, halfDiagY + h])
+                        .setFillStyle(sideColorR).setVisible(true);
                 }
 
-                poolObj.label.setPosition(x, y).setText(labelText).setVisible(isRightDown);
+                // Depth
+                var baseDepth = (r + c) * 10 - 1000;
+                poolObj.rect.setDepth(baseDepth + 2);
+                poolObj.img.setDepth(baseDepth + 2);
+                poolObj.sideL.setDepth(baseDepth + 1);
+                poolObj.sideR.setDepth(baseDepth + 1);
+                poolObj.arrow.setDepth(baseDepth + 5);
+                poolObj.tee.marker.setDepth(baseDepth + 6);
+                poolObj.tee.inner.setDepth(baseDepth + 7);
+                poolObj.tee.text.setDepth(baseDepth + 8);
 
                 if (tile.isTee) {
                     poolObj.tee.marker.setPosition(x, y).setVisible(true);
@@ -720,5 +744,7 @@
             }
         });
     }
+
+
 
 })(typeof window !== 'undefined' ? window : this);
