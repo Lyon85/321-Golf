@@ -186,18 +186,19 @@
             // Debug/Info Labels
             var label = scene.add.text(0, 0, '', {
                 family: 'monospace',
-                fontSize: '12px',
+                fontSize: '24px',
                 color: '#000000',
-                align: 'center'
-            }).setOrigin(0.5, 1.5).setAlpha(0.6).setDepth(-10).setVisible(false);
+                align: 'center',
+                fontStyle: 'bold'
+            }).setOrigin(0.5, 0).setAlpha(0.8).setDepth(-5).setVisible(false);
 
             // Slope Arrows
             var arrow = scene.add.text(0, 0, '→', {
                 family: 'monospace',
-                fontSize: '24px',
+                fontSize: '48px',
                 color: '#000000',
                 fontStyle: '900'
-            }).setOrigin(0.5).setAlpha(0.7).setDepth(-10).setVisible(false);
+            }).setOrigin(0.5).setAlpha(0.9).setDepth(-5).setVisible(false);
 
             // Tee Visuals
             var teeMarker = scene.add.circle(0, 0, 12, 0xff0000).setDepth(-9).setVisible(false);
@@ -288,7 +289,7 @@
         if (p && p.body) {
             var pc = Math.floor(p.body.position.x / S);
             var pr = Math.floor(p.body.position.y / S);
-            var range = 50;
+            var range = 12;
 
             startRow = Math.max(startRow, pr - range);
             endRow = Math.min(endRow, pr + range);
@@ -417,6 +418,28 @@
                     poolObj.tee.text.setPosition(x, y).setVisible(true);
                 }
 
+                // --- Slope Inspection ---
+                if (state.inspectPoint) {
+                    var pc = Math.floor(p.body.position.x / S);
+                    var pr = Math.floor(p.body.position.y / S);
+                    var dist = Math.sqrt(Math.pow(c - pc, 2) + Math.pow(r - pr, 2));
+
+                    if (dist <= Golf.INSPECT_RADIUS && (tile.type === 'incline' || tile.incline > 0)) {
+                        // Rotation: tile.direction 0 is North (-Y), 90 is East (+X)
+                        // Arrow character '→' defaults to pointing East (0 rad)
+                        // So we subtract 90 to match the compass
+                        var arrowRad = Phaser.Math.DegToRad(tile.direction - 90);
+
+                        poolObj.arrow.setPosition(x, topY)
+                            .setRotation(arrowRad)
+                            .setVisible(true);
+
+                        poolObj.label.setPosition(x, topY + 20)
+                            .setText(tile.incline + '°')
+                            .setVisible(true);
+                    }
+                }
+
                 poolIdx++;
             }
         }
@@ -432,7 +455,7 @@
         if (state.mapGrid && state.mapGrid[r] && state.mapGrid[r][c]) {
             var tile = state.mapGrid[r][c];
 
-            if (tile.type === 'incline' && tile.direction !== null) {
+            if (tile.incline > 0 && tile.direction !== null) {
                 var inclineDeg = tile.incline || 0;
 
                 if (inclineDeg === 0) return { x: 0, y: 0 };
@@ -454,71 +477,6 @@
 
         return { x: 0, y: 0 };
     };
-
-
-    Golf.applySlopePhysics = function (scene, ball) {
-
-        if (!ball || !ball.body) return;
-
-        var body = ball.body;
-
-        // Determine terrain under the ball (for sand/bunker behavior etc.)
-        var tile = Golf.getTileAt(ball.x, ball.y);
-        var isBunker = tile && tile.type === 'bunker';
-
-        // Get slope force at ball position
-        var slope = Golf.getSlopeAt(ball.x, ball.y);
-
-        var vx = body.velocity.x;
-        var vy = body.velocity.y;
-        var speed = Math.sqrt(vx * vx + vy * vy);
-
-        // In bunkers, aggressively squash velocity every frame so the ball
-        // loses almost all of its momentum as soon as it hits the sand.
-        if (isBunker && speed > 0.4) {
-            var damp = 0.18; // keep only ~18% of current speed
-            scene.matter.body.setVelocity(body, { x: vx * damp, y: vy * damp });
-            vx = body.velocity.x;
-            vy = body.velocity.y;
-            speed = Math.sqrt(vx * vx + vy * vy);
-        }
-
-        var slopeForceMag = Math.sqrt(slope.x * slope.x + slope.y * slope.y);
-
-        // --- STATIC FRICTION SIMULATION ---
-        // In bunkers we want the ball to come to rest much more aggressively,
-        // so we use a higher effective "static" threshold there.
-        var staticSpeedThreshold = Golf.STATIC_SPEED_THRESHOLD;
-        if (isBunker) {
-            staticSpeedThreshold = 0.8;
-        }
-
-        if (
-            speed < staticSpeedThreshold &&
-            slopeForceMag < Golf.STATIC_FORCE_THRESHOLD
-        ) {
-            // Snap to rest
-            scene.matter.body.setVelocity(body, { x: 0, y: 0 });
-            body.force.x = 0;
-            body.force.y = 0;
-            return;
-        }
-
-        // --- LOW SPEED EXTRA ROLLING RESISTANCE ---
-        // For bunkers, always use the dedicated (very high) friction so the ball
-        // virtually stops as soon as it touches sand.
-        if (!isBunker && speed < 0.25) {
-            body.frictionAir = Golf.LOW_SPEED_FRICTION;
-        } else {
-            var baseFriction = Golf.getFrictionAt(ball.x, ball.y);
-            body.frictionAir = isBunker ? baseFriction * 3 : baseFriction;
-        }
-
-        // --- APPLY DOWNHILL FORCE ---
-        scene.matter.body.applyForce(body, body.position, slope);
-    };
-
-
     /**
      * Spawns a hole at a random predetermined position.
      * Call this at game start and after each successful putt.

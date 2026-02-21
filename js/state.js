@@ -18,6 +18,7 @@
         particles: null,
         terrains: [],
         myPlayerId: null, // Server-assigned player ID (0 or 1)
+        inspectPoint: null, // Point to inspect for slope info
         lastProcessedInput: 0,
         pendingInputs: []
     };

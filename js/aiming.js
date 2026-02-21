@@ -14,6 +14,10 @@
         var isRightDown = activePointer.rightButtonDown();
         var isLocal = !pointer;
 
+        if (isLocal && isRightDown) {
+            state.inspectPoint = Golf.fromIsometric(activePointer.worldX, activePointer.worldY);
+        }
+
         if (isMouseDown) {
             if (!p.isAiming) {
                 if (!p.activeClub) {

@@ -11,6 +11,7 @@
     Golf.CAT_TERRAIN = 0x0080;
     Golf.CAT_DEEP_WATER = 0x0100;
     Golf.LOBBY_ROOM_PREFIX = '321golf-room-';
+    Golf.INSPECT_RADIUS = 5; // Radius in tiles for slope inspection
 
     // Elevation Constants
     Golf.SLOPE_FORCE_MULT = 0.0003;
@@ -25,8 +26,8 @@
     ];
 
     Golf.CLUB_TYPES = {
-        DRIVER: { name: 'Driver', power: 0.015, accuracy: 0.7, color: 0xffd32a, arc: 1.5 },
-        IRON: { name: 'Iron', power: 0.009, accuracy: 0.95, color: 0xff3f34, arc: 1.0 },
+        DRIVER: { name: 'Driver', power: 0.02, accuracy: 0.5, color: 0xffd32a, arc: 1.5 },
+        IRON: { name: 'Iron', power: 0.01, accuracy: 0.75, color: 0xff3f34, arc: 1.0 },
         PUTTER: { name: 'Putter', power: 0.005, accuracy: 1.0, color: 0x0fbcf9, arc: 0 }
     };
 
@@ -50,16 +51,16 @@
 
     Golf.TERRAIN_TYPES = {
         GRASS: { name: 'Grass', color: 0x2ecc71, frictionAir: 0.015, label: 'grass', elevation: 0 },
-        G1: { name: 'Grass 1', color: 0x6BD99A, frictionAir: 0.015, label: 'g1', elevation: 0 },
-        G2: { name: 'Grass 2', color: 0x2ECC71, frictionAir: 0.015, label: 'g2', elevation: 0 },
-        G3: { name: 'Grass 3', color: 0x15964B, frictionAir: 0.015, label: 'g3', elevation: 0 },
-        ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 0.05, label: 'rough', elevation: 5 },
-        BUNKER: { name: 'Bunker', color: 0xf1c40f, frictionAir: 2.2, label: 'bunker', elevation: 0 },
-        WATER: { name: 'Water', color: 0x3498db, frictionAir: 0.2, label: 'water', elevation: 0 },
+        G1: { name: 'Grass 1', color: 0x6BD99A, frictionAir: 0.1, label: 'g1', elevation: 0 },
+        G2: { name: 'Grass 2', color: 0x2ECC71, frictionAir: 0.6, label: 'g2', elevation: 0 },
+        G3: { name: 'Grass 3', color: 0x15964B, frictionAir: 0.8, label: 'g3', elevation: 0 },
+        ROUGH: { name: 'Rough', color: 0x27ae60, frictionAir: 1, label: 'rough', elevation: 5 },
+        BUNKER: { name: 'Bunker', color: 0xf1c40f, frictionAir: 1, label: 'bunker', elevation: 0, shotPowerMult: 0.4, shotAccuracyPenalty: 15 },
+        WATER: { name: 'Water', color: 0x3498db, frictionAir: 1, label: 'water', elevation: 0 },
 
-        WATER1: { name: 'Shallow Water', color: 0x5dade2, frictionAir: 0.1, label: 'water1', elevation: 0 },
-        WATER2: { name: 'Deep Water', color: 0x3498db, frictionAir: 0.2, label: 'water2', elevation: 0 },
-        WATER3: { name: 'Abyss', color: 0x2874a6, frictionAir: 0.3, label: 'water3', elevation: 0 },
+        WATER1: { name: 'Shallow Water', color: 0x5dade2, frictionAir: 1, label: 'water1', elevation: 0 },
+        WATER2: { name: 'Deep Water', color: 0x3498db, frictionAir: 1, label: 'water2', elevation: 0 },
+        WATER3: { name: 'Abyss', color: 0x2874a6, frictionAir: 1, label: 'water3', elevation: 0 },
         MOUNTAIN: { name: 'Mountain', color: 0x7f8c8d, frictionAir: 0.1, label: 'mountain', elevation: 20 },
         M1: { name: 'Mountain 1', color: 0xA2B4B5, frictionAir: 0.1, label: 'm1', elevation: 30 },
         M2: { name: 'Mountain 2', color: 0x7f8c8d, frictionAir: 0.1, label: 'm2', elevation: 60 },

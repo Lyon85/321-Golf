@@ -153,19 +153,20 @@
         // Offset forward direction by -45 degrees for isometric alignment
         var angle = cart.body.angle - Math.PI / 2;
 
-        // Elevation Climbing Restriction: Max climb is 5
-        var currentElevation = Golf.getElevationAt(cart.body.position.x, cart.body.position.y);
+        // Tile-type restriction: cart cannot enter water or mountain tiles
         var checkDist = 45; // Look ahead/back slightly
 
         var aheadX = cart.body.position.x + Math.cos(angle) * checkDist;
         var aheadY = cart.body.position.y + Math.sin(angle) * checkDist;
-        var aheadElev = Golf.getElevationAt(aheadX, aheadY);
-        var isSteepAhead = (aheadElev - currentElevation) > 5;
+        var aheadTile = Golf.getTileAt(aheadX, aheadY);
+        var aheadType = aheadTile ? aheadTile.type : 'grass';
+        var isSteepAhead = aheadType === 'water' || aheadType === 'water1' || aheadType === 'water2' || aheadType === 'water3' || aheadType === 'mountain';
 
         var backX = cart.body.position.x - Math.cos(angle) * checkDist;
         var backY = cart.body.position.y - Math.sin(angle) * checkDist;
-        var backElev = Golf.getElevationAt(backX, backY);
-        var isSteepBack = (backElev - currentElevation) > 5;
+        var backTile = Golf.getTileAt(backX, backY);
+        var backType = backTile ? backTile.type : 'grass';
+        var isSteepBack = backType === 'water' || backType === 'water1' || backType === 'water2' || backType === 'water3' || backType === 'mountain';
 
         // Helper for crash effect
         var triggerCrash = function () {

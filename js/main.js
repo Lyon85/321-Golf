@@ -200,6 +200,7 @@
 
     function update(time, delta) {
         var scene = this;
+        state.inspectPoint = null; // Reset every frame, will be set in aiming.js if right-click is held
         if (state.isWaitingToStart) return;
         if (scene.sinkCooldownFrames > 0) scene.sinkCooldownFrames--;
 
@@ -218,16 +219,17 @@
             }
         }
 
-        Golf.updateHoleArrow(scene);
-        Golf.updateMapVisibility(scene);
-
-        // Send player input to server every frame
-        // Golf.sendPlayerInput(scene); // Removing old placeholder
-
-        var localPlayerIndex = state.myPlayerId !== null ? state.myPlayerId : 0;
         if (state.players[localPlayerIndex] && Golf.Networking) {
             Golf.Networking.sendPlayerInput(state.players[localPlayerIndex]);
         }
+
+        // --- Handle Local Input BEFORE map visibility so inspectPoint is set ---
+        if (state.players[localPlayerIndex] && !state.players[localPlayerIndex].isAI) {
+            Golf.handleHumanInput(scene, state.players[localPlayerIndex], delta);
+        }
+
+        Golf.updateHoleArrow(scene);
+        Golf.updateMapVisibility(scene);
 
         // --- ROBUST INPUT CHECK ---
         var ePressed = Phaser.Input.Keyboard.JustDown(scene.keys.E);
@@ -254,7 +256,7 @@
             var isLocalPlayer = (state.myPlayerId === null && index === 0) || (index === state.myPlayerId);
 
             if (isLocalPlayer && !p.isAI) {
-                Golf.handleHumanInput(scene, p, delta);
+                // Already handled above
             }
 
             var pSprite = p.sprite;
@@ -391,9 +393,8 @@
                         // In bunkers: very high drag and no slope forces.
                         // This keeps the motion mostly one-way from the hit,
                         // then lets the ball roll just a short distance before stopping.
-                        var bunkerFriction = Golf.getFrictionAt(p.ball.position.x, p.ball.position.y) * 3;
-                        p.ball.frictionAir = bunkerFriction;
-
+                        // The frictionAir value for bunkers is now defined directly in Golf.TERRAIN_TYPES.BUNKER.frictionAir
+                        p.ball.frictionAir = Golf.TERRAIN_TYPES.BUNKER.frictionAir;
                         // Once the ball is almost stopped in sand, snap it fully to rest.
                         if (bSpeed < 0.2) {
                             scene.matter.body.setVelocity(p.ball, { x: 0, y: 0 });
@@ -407,9 +408,12 @@
                         // Apply Slopes
                         var slopeForce = Golf.getSlopeAt(p.ball.position.x, p.ball.position.y);
                         if (slopeForce.x !== 0 || slopeForce.y !== 0) {
+                            // Cap speed so slopes can't accelerate the ball infinitely
+                            var maxSlopeSpeed = 5;
+                            var slopeScale = Math.max(0, 1 - (bSpeed / maxSlopeSpeed));
                             scene.matter.body.applyForce(p.ball, p.ball.position, {
-                                x: slopeForce.x * p.ball.mass,
-                                y: slopeForce.y * p.ball.mass
+                                x: slopeForce.x * slopeScale,
+                                y: slopeForce.y * slopeScale
                             });
                         }
                     }
@@ -697,17 +701,17 @@
         });
 
         function drawBody(g, body) {
-            var elev = Golf.getElevationAt(body.position.x, body.position.y);
-            var iso = Golf.toIsometric(body.position.x, body.position.y);
-
             if (body.circleRadius) {
+                var elev = Golf.getElevationAt(body.position.x, body.position.y);
+                var iso = Golf.toIsometric(body.position.x, body.position.y);
                 g.strokeEllipse(iso.x, iso.y - elev, body.circleRadius * 2, body.circleRadius);
             } else {
                 g.beginPath();
                 body.vertices.forEach(function (v, i) {
+                    var vElev = Golf.getElevationAt(v.x, v.y);
                     var isoV = Golf.toIsometric(v.x, v.y);
-                    if (i === 0) g.moveTo(isoV.x, isoV.y - elev);
-                    else g.lineTo(isoV.x, isoV.y - elev);
+                    if (i === 0) g.moveTo(isoV.x, isoV.y - vElev);
+                    else g.lineTo(isoV.x, isoV.y - vElev);
                 });
                 g.closePath();
                 g.strokePath();
@@ -760,11 +764,16 @@
 
     var config = {
         type: Phaser.AUTO,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: 1600,
+        height: 900,
         parent: 'game-container',
         dom: {
             createContainer: true
+        },
+
+        scale: {
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH
         },
 
         fps: {
